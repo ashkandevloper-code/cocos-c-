@@ -1,0 +1,41 @@
+cr 3 #0 t0 place248.000000 dir0.613617,-0.789604 pw0.914690 st423 own1 opp0 qfalse foulfalse covfalse ret[] conttrue h922181937
+cr 3 #1 t0 place248.000000 dir0.604666,-0.796479 pw0.786357 st460 own1 opp0 qfalse foulfalse covfalse ret[] conttrue h1359305132
+cr 3 #2 t0 place435.179250 dir0.577455,-0.816422 pw0.828651 st438 own1 opp0 qfalse foulfalse covfalse ret[] conttrue h29015397
+cr 3 #3 t0 place776.000000 dir-0.629155,-0.777280 pw0.756489 st416 own1 opp0 qfalse foulfalse covfalse ret[] conttrue h4250555292
+cr 3 #4 t0 place356.860133 dir-0.000723,-1.000000 pw0.965879 st493 own1 opp0 qfalse foulfalse covfalse ret[] conttrue h3009813031
+cr 3 #5 t0 place248.000000 dir0.562950,-0.826491 pw1.000000 st443 own1 opp0 qfalse foulfalse covfalse ret[] conttrue h2507575054
+cr 3 #6 t0 place657.995515 dir0.358219,-0.933638 pw0.634887 st398 own1 opp0 qfalse foulfalse covfalse ret[] conttrue h2176440431
+cr 3 #7 t0 place255.977975 dir0.689519,-0.724267 pw0.750516 st413 own0 opp0 qtrue foulfalse covfalse ret[] conttrue h2820077405
+cr 3 #8 t0 place455.806066 dir0.108391,-0.994108 pw0.905302 st469 own0 opp0 qfalse foulfalse covfalse ret[] contfalse h867857002
+cr 3 #9 t1 place293.642756 dir0.641807,0.766866 pw0.790938 st448 own0 opp0 qfalse foulfalse covfalse ret[] contfalse h483278078
+cr 3 #10 t0 place715.766995 dir0.004229,-0.999991 pw0.985951 st469 own1 opp0 qfalse foulfalse covfalse ret[] conttrue h3150811426
+cr 3 #11 t0 place602.844888 dir-0.595728,-0.803186 pw0.927167 st55 own0 opp0 qfalse foultrue covfalse ret[1] contfalse h78184838
+cr 3 #12 t1 place776.000000 dir0.419283,0.907856 pw0.647566 st398 own1 opp0 qfalse foulfalse covfalse ret[] conttrue h421270597
+cr 3 #13 t1 place248.000000 dir0.639749,0.768584 pw0.761207 st472 own0 opp0 qfalse foulfalse covfalse ret[] contfalse h2926357573
+cr 3 #14 t0 place248.000000 dir0.647845,-0.761772 pw0.756058 st415 own1 opp0 qfalse foulfalse covfalse ret[] conttrue h1646518714
+cr 3 #15 t0 place249.051760 dir0.728476,-0.685071 pw0.818378 st468 own0 opp0 qfalse foulfalse covfalse ret[] contfalse h2491051155
+cr 3 #16 t1 place266.239000 dir0.106277,0.994337 pw0.667640 st463 own1 opp0 qfalse foulfalse covfalse ret[] conttrue h448016205
+cr 3 #17 t1 place248.000000 dir0.657566,0.753397 pw0.761207 st437 own0 opp0 qfalse foulfalse covfalse ret[] contfalse h1885296943
+cr 3 #18 t0 place776.000000 dir0.241858,-0.970312 pw0.617162 st395 own0 opp0 qtrue foulfalse covfalse ret[] conttrue h861685196
+cr 3 #19 t0 place347.149622 dir-0.336477,-0.941692 pw0.631412 st397 own1 opp0 qfalse foulfalse covtrue ret[] contfalse h921162890
+cr 3 end winner 0 pts [10, 0] rem 0/7 json 0
+cr 8 #0 t0 place715.238774 dir-0.405370,-0.914153 pw0.751365 st449 own0 opp0 qfalse foulfalse covfalse ret[] contfalse h2703455799
+cr 8 #1 t1 place639.779000 dir-0.188375,0.982097 pw0.728343 st442 own1 opp0 qfalse foulfalse covfalse ret[] conttrue h1158697533
+cr 8 #2 t1 place248.000000 dir0.203617,0.979051 pw1.000000 st439 own1 opp0 qfalse foulfalse covfalse ret[] conttrue h3244933676
+cr 8 #3 t1 place673.982824 dir-0.803484,0.595326 pw0.988328 st487 own1 opp0 qfalse foulfalse covfalse ret[] conttrue h3702390525
+cr 8 #4 t1 place739.070000 dir-0.134412,0.990926 pw0.799641 st439 own1 opp0 qfalse foulfalse covfalse ret[] conttrue h1135945588
+cr 8 #5 t1 place248.000000 dir-0.453791,0.891108 pw0.657623 st408 own1 opp0 qfalse foulfalse covfalse ret[] conttrue h3712689429
+cr 8 #6 t1 place248.000000 dir0.304137,0.952628 pw1.000000 st460 own0 opp0 qfalse foultrue covfalse ret[12] contfalse h3587792191
+cr 8 #7 t0 place267.892555 dir0.864983,-0.501801 pw0.962928 st497 own0 opp0 qfalse foulfalse covfalse ret[] contfalse h11673365
+cr 8 #8 t1 place248.000000 dir0.578225,0.815877 pw0.921099 st400 own1 opp0 qfalse foulfalse covfalse ret[] conttrue h3164614889
+cr 8 #9 t1 place248.000000 dir-0.251336,0.967900 pw0.618210 st393 own1 opp0 qfalse foulfalse covfalse ret[] conttrue h1672725350
+cr 8 #10 t1 place248.000000 dir0.512754,0.858536 pw0.903280 st477 own1 opp0 qfalse foulfalse covfalse ret[] conttrue h485458725
+cr 8 #11 t1 place575.009373 dir-0.191698,0.981454 pw0.783854 st467 own0 opp0 qfalse foulfalse covfalse ret[] contfalse h3538639823
+cr 8 #12 t0 place736.000000 dir-0.407439,-0.913232 pw0.976145 st480 own0 opp0 qfalse foulfalse covfalse ret[] contfalse h2159607897
+cr 8 #13 t1 place248.756668 dir0.511680,0.859176 pw0.580072 st468 own0 opp0 qfalse foulfalse covfalse ret[] contfalse h2521743783
+cr 8 #14 t0 place248.000000 dir-0.349287,-0.937016 pw0.630013 st435 own0 opp0 qfalse foulfalse covfalse ret[] contfalse h4231999414
+cr 8 #15 t1 place248.000000 dir0.588223,0.808699 pw0.889437 st465 own1 opp0 qfalse foulfalse covfalse ret[] conttrue h3428897899
+cr 8 #16 t1 place248.000000 dir-0.184918,0.982754 pw0.746146 st391 own0 opp0 qtrue foulfalse covfalse ret[] conttrue h508296715
+cr 8 #17 t1 place248.000000 dir-0.377226,-0.926121 pw0.431193 st398 own1 opp0 qfalse foulfalse covtrue ret[] contfalse h4167009797
+cr 8 end winner 1 pts [0, 12] rem 9/0 json 1
+pass 1 1 2163298232

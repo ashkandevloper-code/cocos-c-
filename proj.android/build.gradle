@@ -17,6 +17,12 @@ allprojects {
     }
 }
 
+// Pin the NDK for every module (incl. :libcocos2dx), otherwise AGP 4.1 silently downloads its default r21b.
+subprojects {
+    plugins.withId('com.android.library') { android { ndkVersion PROP_NDK_VERSION } }
+    plugins.withId('com.android.application') { android { ndkVersion PROP_NDK_VERSION } }
+}
+
 task clean(type: Delete) {
     delete rootProject.buildDir
 }

@@ -1,0 +1,267 @@
+sort 84,198,128,168,45,120,49,57,62,77,1146,1140,1182,1127,1048,1155,1055,2076,2025,2030,2010,2169,2118,2113,2072,2093,2135,2086,3183,3044,3070,3073,3108,3134,3085,3199,4154,4175,4193,4170,4131,4054,4157,4004,4001,4190,5088,5075,5098,5101,5000,5184,5042,5099,5129,5022,5020,5136,5015,5006,5159,6121,6002,6082,6124,6133,6191,6187,6162,6145,6111,6114,7034,7065,7194,7192,7064,7027,7091,7019,7094,7197,7137,7058,7110,7148,7150,7151,7061,7144,8143,8139,8107,8180,8195,8009,8087,9132,9178,9196,9109,9116,9063,9008,9142,9149,9089,9161,9096,10028,10138,10186,10119,10037,10003,10147,10013,10052,11102,11105,11056,11029,11117,11053,11068,11035,11050,11095,11173,11177,12059,12021,12103,12005,12014,12078,12043,12011,12023,12067,12016,12174,12176,12172,12171,12060,12167,12164,12100,12097,13031,13079,13166,13041,13046,13153,13038,13181,13156,13158,13090,14122,14130,14032,14179,14165,14051,14106,14083,14126,14189,14036,14081,14007,14141,14018,14071,14115,14012,14125,14066,15163,15160,15152,15123,15112,15104,15092,15080,15074,15040,15039,15024,15017,16185,16188,16069,16047,16026,16033
+uno 1/2 st0 s0 play 29 null oktrue top violet-2 acviolet
+uno 1/2 st1 s1 play 49 null oktrue top violet-drawTwo acviolet
+uno 1/2 st2 s1 play 48 null oktrue top violet-reverse acviolet
+uno 1/2 st3 s1 draw violet-reverse
+uno 1/2 st4 s1 draw pink-reverse
+uno 1/2 st5 s1 draw wild-wildDrawFour
+uno 1/2 st6 s1 play 67 null oktrue top gold-9 acgold
+uno 1/2 st7 s0 play 66 null oktrue top gold-8 acgold
+uno 1/2 st8 s1 play 68 null oktrue top gold-9 acgold
+uno 1/2 st9 s0 play 65 null oktrue top gold-8 acgold
+uno 1/2 st10 s1 play 69 null oktrue top gold-skip acgold
+uno 1/2 st11 s1 draw turquoise-2
+uno 1/2 st12 s0 play 19 null oktrue top turquoise-skip acturquoise
+uno 1/2 st13 s0 play 20 null oktrue top turquoise-reverse acturquoise
+uno 1/2 st14 s0 play 16 null oktrue top turquoise-8 acturquoise
+uno 1/2 st15 s1 play 9 null oktrue top turquoise-5 acturquoise
+uno 1/2 st16 s0 play 100 pink oktrue top wild-wild acpink
+uno 1/2 st17 s1 draw violet-1
+uno 1/2 st18 s0 play 96 null oktrue top pink-drawTwo acpink
+uno 1/2 st19 s0 play 98 null oktrue top pink-reverse acpink
+uno 1/2 st20 s0 play 91 null oktrue top pink-8 acpink
+uno 1/2 st21 s1 play 40 null oktrue top violet-8 acviolet
+uno 1/2 st22 s0 play 32 null oktrue top violet-4 acviolet
+uno 1/2 st23 s1 play 44 null oktrue top violet-skip acviolet
+uno 1/2 st24 s1 play 26 null oktrue top violet-1 acviolet
+uno 1/2 st25 s0 play 76 null oktrue top pink-1 acpink
+uno 1/2 st26 s1 draw violet-8
+uno 1/2 st27 s0 play 80 null oktrue top pink-3 acpink
+uno 1/2 winner 0 score 14 events 61 last UnoEvent(win, p0, null, x14, null)
+uno 1/4 st0 s0 play 29 null oktrue top violet-2 acviolet
+uno 1/4 st1 s1 play 48 null oktrue top violet-reverse acviolet
+uno 1/4 st2 s0 play 20 null oktrue top turquoise-reverse acturquoise
+uno 1/4 st3 s1 play 9 null oktrue top turquoise-5 acturquoise
+uno 1/4 st4 s2 draw turquoise-9
+uno 1/4 st5 s3 play 8 null oktrue top turquoise-4 acturquoise
+uno 1/4 st6 s0 play 19 null oktrue top turquoise-skip acturquoise
+uno 1/4 st7 s2 play 44 null oktrue top violet-skip acviolet
+uno 1/4 st8 s0 draw violet-6
+uno 1/4 st9 s1 play 45 null oktrue top violet-reverse acviolet
+uno 1/4 st10 s0 draw pink-6
+uno 1/4 st11 s3 play 49 null oktrue top violet-drawTwo acviolet
+uno 1/4 st12 s1 play 26 null oktrue top violet-1 acviolet
+uno 1/4 st13 s0 draw pink-9
+uno 1/4 st14 s3 play 40 null oktrue top violet-8 acviolet
+uno 1/4 st15 s2 play 33 null oktrue top violet-4 acviolet
+uno 1/4 st16 s1 draw turquoise-2
+uno 1/4 st17 s0 draw violet-5
+uno 1/4 st18 s3 play 100 gold oktrue top wild-wild acgold
+uno 1/4 st19 s2 play 66 null oktrue top gold-8 acgold
+uno 1/4 st20 s1 play 67 null oktrue top gold-9 acgold
+uno 1/4 st21 s0 play 65 null oktrue top gold-8 acgold
+uno 1/4 st22 s3 play 69 null oktrue top gold-skip acgold
+uno 1/4 st23 s1 play 68 null oktrue top gold-9 acgold
+uno 1/4 st24 s0 play 92 null oktrue top pink-9 acpink
+uno 1/4 st25 s3 play 80 null oktrue top pink-3 acpink
+uno 1/4 st26 s2 play 91 null oktrue top pink-8 acpink
+uno 1/4 st27 s1 play 76 null oktrue top pink-1 acpink
+uno 1/4 st28 s0 play 96 null oktrue top pink-drawTwo acpink
+uno 1/4 st29 s2 play 95 null oktrue top pink-reverse acpink
+uno 1/4 st30 s3 play 97 null oktrue top pink-skip acpink
+uno 1/4 st31 s1 draw gold-4
+uno 1/4 st32 s2 play 98 null oktrue top pink-reverse acpink
+uno 1/4 st33 s1 draw violet-9
+uno 1/4 st34 s0 play 86 null oktrue top pink-6 acpink
+uno 1/4 st35 s3 play 105 turquoise oktrue top wild-wildDrawFour acturquoise
+uno 1/4 st36 s1 play 3 null oktrue top turquoise-2 acturquoise
+uno 1/4 st37 s0 play 16 null oktrue top turquoise-8 acturquoise
+uno 1/4 st38 s3 play 21 null oktrue top turquoise-drawTwo acturquoise
+uno 1/4 winner 3 score 113 events 73 last UnoEvent(win, p3, null, x113, null)
+uno 42/2 st0 s0 play 79 null oktrue top pink-2 acpink
+uno 42/2 st1 s1 draw gold-8
+uno 42/2 st2 s0 play 4 null oktrue top turquoise-2 acturquoise
+uno 42/2 st3 s1 play 22 null oktrue top turquoise-skip acturquoise
+uno 42/2 st4 s1 play 14 null oktrue top turquoise-7 acturquoise
+uno 42/2 st5 s0 play 13 null oktrue top turquoise-7 acturquoise
+uno 42/2 st6 s1 play 8 null oktrue top turquoise-4 acturquoise
+uno 42/2 st7 s0 play 15 null oktrue top turquoise-8 acturquoise
+uno 42/2 st8 s1 play 2 null oktrue top turquoise-1 acturquoise
+uno 42/2 st9 s0 play 1 null oktrue top turquoise-1 acturquoise
+uno 42/2 st10 s1 draw turquoise-skip
+uno 42/2 st11 s1 draw violet-2
+uno 42/2 st12 s0 play 20 null oktrue top turquoise-reverse acturquoise
+uno 42/2 st13 s0 draw wild-wild
+uno 42/2 st14 s1 play 71 null oktrue top gold-drawTwo acgold
+uno 42/2 st15 s1 play 65 null oktrue top gold-8 acgold
+uno 42/2 st16 s0 play 91 null oktrue top pink-8 acpink
+uno 42/2 st17 s1 draw gold-9
+uno 42/2 st18 s0 draw gold-skip
+uno 42/2 st19 s1 draw turquoise-9
+uno 42/2 st20 s0 draw violet-9
+uno 42/2 st21 s1 draw violet-3
+uno 42/2 st22 s0 draw gold-5
+uno 42/2 st23 s1 draw pink-reverse
+uno 42/2 st24 s1 draw violet-reverse
+uno 42/2 st25 s1 play 30 null oktrue top violet-3 acviolet
+uno 42/2 st26 s0 play 42 null oktrue top violet-9 acviolet
+uno 42/2 st27 s1 play 28 null oktrue top violet-2 acviolet
+uno 42/2 st28 s0 play 36 null oktrue top violet-6 acviolet
+uno 42/2 st29 s1 play 25 null oktrue top violet-0 acviolet
+uno 42/2 st30 s0 draw wild-wildDrawFour
+uno 42/2 st31 s0 play 51 null oktrue top gold-1 acgold
+uno 42/2 st32 s1 play 68 null oktrue top gold-9 acgold
+uno 42/2 st33 s0 play 69 null oktrue top gold-skip acgold
+uno 42/2 st34 s0 play 60 null oktrue top gold-5 acgold
+uno 42/2 winner 0 score 33 events 68 last UnoEvent(win, p0, null, x33, null)
+uno 42/4 st0 s0 play 79 null oktrue top pink-2 acpink
+uno 42/4 st1 s1 play 28 null oktrue top violet-2 acviolet
+uno 42/4 st2 s2 play 4 null oktrue top turquoise-2 acturquoise
+uno 42/4 st3 s3 play 18 null oktrue top turquoise-9 acturquoise
+uno 42/4 st4 s0 play 13 null oktrue top turquoise-7 acturquoise
+uno 42/4 st5 s1 play 22 null oktrue top turquoise-skip acturquoise
+uno 42/4 st6 s3 play 2 null oktrue top turquoise-1 acturquoise
+uno 42/4 st7 s0 play 20 null oktrue top turquoise-reverse acturquoise
+uno 42/4 st8 s3 play 95 null oktrue top pink-reverse acpink
+uno 42/4 st9 s0 draw gold-3
+uno 42/4 st10 s1 draw violet-7
+uno 42/4 st11 s2 play 89 null oktrue top pink-7 acpink
+uno 42/4 st12 s3 play 14 null oktrue top turquoise-7 acturquoise
+uno 42/4 st13 s0 play 19 null oktrue top turquoise-skip acturquoise
+uno 42/4 st14 s2 play 69 null oktrue top gold-skip acgold
+uno 42/4 st15 s0 play 51 null oktrue top gold-1 acgold
+uno 42/4 st16 s1 play 71 null oktrue top gold-drawTwo acgold
+uno 42/4 st17 s3 play 65 null oktrue top gold-8 acgold
+uno 42/4 st18 s0 play 56 null oktrue top gold-3 acgold
+uno 42/4 st19 s1 play 68 null oktrue top gold-9 acgold
+uno 42/4 st20 s2 play 60 null oktrue top gold-5 acgold
+uno 42/4 st21 s3 draw gold-1
+uno 42/4 st22 s0 draw violet-8
+uno 42/4 st23 s1 play 63 null oktrue top gold-7 acgold
+uno 42/4 st24 s2 play 101 turquoise oktrue top wild-wild acturquoise
+uno 42/4 st25 s3 draw wild-wildDrawFour
+uno 42/4 st26 s1 play 39 null oktrue top violet-7 acviolet
+uno 42/4 st27 s2 draw violet-7
+uno 42/4 st28 s3 play 25 null oktrue top violet-0 acviolet
+uno 42/4 st29 s0 play 36 null oktrue top violet-6 acviolet
+uno 42/4 st30 s1 play 30 null oktrue top violet-3 acviolet
+uno 42/4 st31 s2 draw turquoise-9
+uno 42/4 st32 s3 draw gold-reverse
+uno 42/4 st33 s0 play 41 null oktrue top violet-8 acviolet
+uno 42/4 st34 s1 draw wild-wild
+uno catch 2 -> true
+uno 42/4 st35 s2 play 24 null oktrue top turquoise-drawTwo acturquoise
+uno 42/4 st36 s0 draw pink-6
+uno 42/4 st37 s1 play 8 null oktrue top turquoise-4 acturquoise
+uno 42/4 st38 s2 play 17 null oktrue top turquoise-9 acturquoise
+uno 42/4 st39 s3 draw violet-drawTwo
+uno 42/4 st40 s0 play 42 null oktrue top violet-9 acviolet
+uno 42/4 st41 s1 draw pink-3
+uno 42/4 st42 s2 draw turquoise-6
+uno 42/4 st43 s3 play 47 null oktrue top violet-skip acviolet
+uno 42/4 st44 s1 draw pink-3
+uno 42/4 st45 s2 draw gold-skip
+uno 42/4 st46 s0 play 97 null oktrue top pink-skip acpink
+uno 42/4 st47 s2 play 85 null oktrue top pink-5 acpink
+uno 42/4 st48 s3 play 91 null oktrue top pink-8 acpink
+uno 42/4 st49 s0 play 98 null oktrue top pink-reverse acpink
+uno 42/4 st50 s3 play 88 null oktrue top pink-7 acpink
+uno 42/4 st51 s2 draw pink-0
+uno 42/4 st52 s1 play 83 null oktrue top pink-4 acpink
+uno 42/4 st53 s0 play 87 null oktrue top pink-6 acpink
+uno 42/4 st54 s3 draw violet-4
+uno 42/4 st55 s2 play 12 null oktrue top turquoise-6 acturquoise
+uno 42/4 st56 s1 draw turquoise-2
+uno 42/4 st57 s0 draw gold-drawTwo
+uno 42/4 st58 s3 draw gold-5
+uno 42/4 st59 s2 play 15 null oktrue top turquoise-8 acturquoise
+uno 42/4 st60 s1 draw violet-5
+uno 42/4 st61 s0 draw turquoise-6
+uno 42/4 st62 s3 draw pink-5
+uno 42/4 st63 s2 play 1 null oktrue top turquoise-1 acturquoise
+uno 42/4 winner 2 score 98 events 116 last UnoEvent(win, p2, null, x98, null)
+uno 99/2 st0 s0 play 60 null oktrue top gold-5 acgold
+uno 99/2 st1 s1 play 67 null oktrue top gold-9 acgold
+uno 99/2 st2 s0 play 58 null oktrue top gold-4 acgold
+uno 99/2 st3 s1 play 83 null oktrue top pink-4 acpink
+uno 99/2 st4 s0 play 80 null oktrue top pink-3 acpink
+uno 99/2 st5 s1 play 94 null oktrue top pink-skip acpink
+uno 99/2 st6 s1 play 91 null oktrue top pink-8 acpink
+uno 99/2 st7 s0 play 104 gold oktrue top wild-wildDrawFour acgold
+uno 99/2 st8 s0 play 70 null oktrue top gold-reverse acgold
+uno 99/2 st9 s0 draw gold-1
+uno 99/2 st10 s1 play 59 null oktrue top gold-5 acgold
+uno 99/2 st11 s0 play 52 null oktrue top gold-1 acgold
+uno 99/2 st12 s1 play 2 null oktrue top turquoise-1 acturquoise
+uno 99/2 st13 s0 draw turquoise-2
+uno 99/2 st14 s1 play 22 null oktrue top turquoise-skip acturquoise
+uno 99/2 st15 s1 play 9 null oktrue top turquoise-5 acturquoise
+uno 99/2 st16 s0 draw turquoise-drawTwo
+uno 99/2 st17 s0 draw violet-4
+uno 99/2 st18 s1 play 0 null oktrue top turquoise-0 acturquoise
+uno 99/2 st19 s0 draw gold-6
+uno 99/2 st20 s1 play 25 null oktrue top violet-0 acviolet
+uno 99/2 st21 s0 play 44 null oktrue top violet-skip acviolet
+uno 99/2 st22 s0 play 30 null oktrue top violet-3 acviolet
+uno 99/2 st23 s1 play 48 null oktrue top violet-reverse acviolet
+uno 99/2 st24 s1 draw violet-7
+uno 99/2 st25 s0 play 33 null oktrue top violet-4 acviolet
+uno catch 1 -> true
+uno 99/2 st26 s1 draw violet-4
+uno 99/2 st27 s0 play 105 pink oktrue top wild-wildDrawFour acpink
+uno 99/2 st28 s0 play 90 null oktrue top pink-8 acpink
+uno 99/2 st29 s1 play 96 null oktrue top pink-drawTwo acpink
+uno 99/2 st30 s1 play 78 null oktrue top pink-2 acpink
+uno 99/2 st31 s0 play 3 null oktrue top turquoise-2 acturquoise
+uno 99/2 st32 s1 play 54 null oktrue top gold-2 acgold
+uno 99/2 st33 s0 play 61 null oktrue top gold-6 acgold
+uno 99/2 st34 s1 play 66 null oktrue top gold-8 acgold
+uno 99/2 st35 s0 draw turquoise-4
+uno 99/2 st36 s1 play 103 violet oktrue top wild-wild acviolet
+uno 99/2 st37 s0 draw gold-0
+uno 99/2 st38 s1 play 36 null oktrue top violet-6 acviolet
+uno 99/2 winner 1 score 7 events 77 last UnoEvent(win, p1, null, x7, null)
+uno 99/4 st0 s0 play 44 null oktrue top violet-skip acviolet
+uno 99/4 st1 s2 play 38 null oktrue top violet-7 acviolet
+uno 99/4 st2 s3 draw wild-wild
+uno 99/4 st3 s0 play 80 null oktrue top pink-3 acpink
+uno 99/4 st4 s1 play 94 null oktrue top pink-skip acpink
+uno 99/4 st5 s3 play 22 null oktrue top turquoise-skip acturquoise
+uno 99/4 st6 s1 play 24 null oktrue top turquoise-drawTwo acturquoise
+uno 99/4 st7 s3 play 9 null oktrue top turquoise-5 acturquoise
+uno 99/4 st8 s0 play 4 null oktrue top turquoise-2 acturquoise
+uno 99/4 st9 s1 play 2 null oktrue top turquoise-1 acturquoise
+uno 99/4 st10 s2 play 0 null oktrue top turquoise-0 acturquoise
+uno 99/4 st11 s3 draw pink-drawTwo
+uno 99/4 st12 s0 draw turquoise-2
+uno 99/4 st13 s1 draw turquoise-3
+uno 99/4 st14 s2 play 30 null oktrue top violet-3 acviolet
+uno 99/4 st15 s3 draw turquoise-4
+uno 99/4 st16 s0 play 33 null oktrue top violet-4 acviolet
+uno 99/4 st17 s1 play 48 null oktrue top violet-reverse acviolet
+uno 99/4 st18 s0 play 70 null oktrue top gold-reverse acgold
+uno 99/4 st19 s1 play 67 null oktrue top gold-9 acgold
+uno 99/4 st20 s2 play 66 null oktrue top gold-8 acgold
+uno 99/4 st21 s3 play 90 null oktrue top pink-8 acpink
+uno 99/4 st22 s0 draw gold-0
+uno 99/4 st23 s1 play 91 null oktrue top pink-8 acpink
+uno 99/4 st24 s2 play 104 violet oktrue top wild-wildDrawFour acviolet
+uno 99/4 st25 s0 draw turquoise-7
+uno 99/4 st26 s1 draw pink-9
+uno 99/4 st27 s2 play 36 null oktrue top violet-6 acviolet
+uno 99/4 st28 s3 play 40 null oktrue top violet-8 acviolet
+uno 99/4 st29 s0 draw pink-7
+uno 99/4 st30 s1 draw gold-4
+uno 99/4 st31 s2 play 25 null oktrue top violet-0 acviolet
+uno 99/4 st32 s3 draw wild-wild
+uno 99/4 st33 s0 play 89 null oktrue top pink-7 acpink
+uno 99/4 st34 s1 play 92 null oktrue top pink-9 acpink
+uno 99/4 st35 s2 draw violet-2
+uno 99/4 st36 s3 play 81 null oktrue top pink-3 acpink
+uno 99/4 st37 s0 draw turquoise-4
+uno 99/4 st38 s1 draw pink-9
+uno 99/4 st39 s2 draw pink-reverse
+uno 99/4 st40 s1 draw gold-1
+uno 99/4 st41 s0 draw gold-drawTwo
+uno 99/4 st42 s3 play 83 null oktrue top pink-4 acpink
+uno 99/4 st43 s2 play 58 null oktrue top gold-4 acgold
+uno 99/4 st44 s1 play 61 null oktrue top gold-6 acgold
+uno 99/4 st45 s0 play 50 null oktrue top gold-0 acgold
+uno 99/4 st46 s3 play 54 null oktrue top gold-2 acgold
+uno 99/4 st47 s2 play 64 null oktrue top gold-7 acgold
+uno 99/4 st48 s1 play 57 null oktrue top gold-4 acgold
+uno 99/4 st49 s0 play 59 null oktrue top gold-5 acgold
+uno 99/4 st50 s3 play 52 null oktrue top gold-1 acgold
+uno 99/4 st51 s2 draw violet-5
+uno 99/4 st52 s1 play 51 null oktrue top gold-1 acgold
+uno 99/4 winner 1 score 95 events 93 last UnoEvent(win, p1, null, x95, null)

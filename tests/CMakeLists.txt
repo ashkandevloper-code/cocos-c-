@@ -13,6 +13,8 @@ add_library(nx_core STATIC ${NX_CORE_SOURCES})
 target_include_directories(nx_core PUBLIC ${NX_ROOT}/Classes ${NX_ROOT}/third_party ${CMAKE_CURRENT_BINARY_DIR}/generated)
 nx_generate_config(${CMAKE_CURRENT_BINARY_DIR}/generated)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+  # No FMA contraction: physics must match the Dart VM bit-for-bit (online replays + golden tests).
+  target_compile_options(nx_core PUBLIC -ffp-contract=off)
   target_compile_options(nx_core PRIVATE -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Wno-class-memaccess)
 endif()
 file(GLOB NX_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)

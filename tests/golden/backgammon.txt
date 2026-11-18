@@ -1,0 +1,100 @@
+bg 5 t0 p0 d5,1 plays8 BgMove(12->7 d5) BgMove(23->22 d1) ev7.2000 pip161/167
+bg 5 t1 p1 d1,6 plays12 BgMove(16->17 d1) BgMove(11->17 d6) ev23.3000 pip161/160
+bg 5 t2 p0 d2,4 plays20 BgMove(5->3 d2) BgMove(7->3 d4) ev11.3000 pip155/160
+bg 5 t3 p1 d1,2 plays21 BgMove(11->13 d2) BgMove(13->14 d1) ev15.1750 pip155/157
+bg 5 t4 p0 d5,5 plays4 BgMove(7->2 d5) BgMove(7->2 d5) BgMove(12->7 d5) BgMove(12->7 d5) ev32.3000 pip135/157
+bg 5 t5 p1 d6,2 plays25 BgMove(14->20 d6) BgMove(18->20 d2) ev13.8000 pip135/149
+bg 5 t6 p0 d4,1 plays24 BgMove(7->3 d4) BgMove(23->22 d1) ev36.5000 pip130/149
+bg 5 t7 p1 d3,2 plays21 BgMove(11->14 d3) BgMove(14->16 d2) ev13.8000 pip130/144
+bg 5 t8 p0 d2,6 plays9 BgMove(3->1 d2) BgMove(7->1 d6) ev48.7500 pip122/144
+bg 5 t9 p1 d3,4 plays22 BgMove(0->4 d4) BgMove(4->7 d3 hit) ev34.6000 pip139/137
+bg 5 t10 p0 d4,3 plays2 BgMove(-1->21 d3) BgMove(5->1 d4) ev31.6000 pip132/137
+bg 5 t11 p1 d5,4 plays16 BgMove(16->21 d5 hit) BgMove(7->11 d4) ev29.0500 pip135/128
+bg 5 t12 p0 d3,6 plays2 BgMove(-1->21 d3 hit) BgMove(21->15 d6) ev76.0750 pip126/150
+bg 5 t13 p1 d3,1 plays5 BgMove(-1->0 d1) BgMove(11->14 d3) ev0.4250 pip126/146
+bg 5 t14 p0 d2,1 plays23 BgMove(15->14 d1 hit) BgMove(14->12 d2) ev94.9000 pip123/161
+bg 5 t15 p1 d1,5 plays7 BgMove(-1->0 d1) BgMove(18->23 d5) ev-5.2000 pip123/155
+bg 5 t16 p0 d3,3 plays20 BgMove(5->2 d3) BgMove(12->9 d3) BgMove(12->9 d3) BgMove(12->9 d3) ev75.3000 pip111/155
+bg 5 t17 p1 d2,4 plays19 BgMove(11->13 d2) BgMove(13->17 d4) ev-13.8000 pip111/149
+bg 5 t18 p0 d3,3 plays15 BgMove(9->6 d3) BgMove(6->3 d3) BgMove(9->6 d3) BgMove(9->6 d3) ev82.8000 pip99/149
+bg 5 t19 p1 d5,6 plays5 BgMove(18->23 d5) BgMove(11->17 d6) ev-8.2000 pip99/138
+bg 5 t20 p0 d3,6 plays1 BgMove(22->19 d3) BgMove(19->13 d6) ev74.5000 pip90/138
+bg 5 t21 p1 d4,3 plays17 BgMove(0->4 d4) BgMove(4->7 d3) ev-14.8000 pip90/131
+bg 5 t22 p0 d1,6 plays8 BgMove(13->7 d6 hit) BgMove(7->6 d1) ev110.1000 pip83/139
+bg 5 t23 p1 d5,2 plays4 BgMove(-1->4 d5) BgMove(20->22 d2 hit) ev-27.5750 pip85/132
+bg 5 t24 p0 d4,2 plays5 BgMove(-1->22 d2 hit) BgMove(6->2 d4) ev130.1000 pip79/155
+bg 5 t25 p1 d3,4 plays1  ev-64.5000 pip79/155
+bg 5 t26 p0 d5,3 plays4 BgMove(22->19 d3) BgMove(19->14 d5) ev138.9000 pip71/155
+bg 5 t27 p1 d5,5 plays22 BgMove(-1->4 d5) BgMove(4->9 d5) BgMove(4->9 d5) BgMove(9->14 d5 hit) ev-26.0500 pip81/135
+bg 5 t28 p0 d4,2 plays5 BgMove(-1->20 d4 hit) BgMove(3->1 d2) ev133.3000 pip75/156
+bg 5 t29 p1 d6,3 plays1  ev-67.0750 pip75/156
+bg 5 t30 p0 d3,3 plays1 BgMove(5->2 d3) BgMove(5->2 d3) BgMove(6->3 d3) BgMove(6->3 d3) ev127.6000 pip63/156
+bg 5 t31 p1 d3,2 plays1  ev-79.0750 pip63/156
+bg 5 t32 p0 d2,6 plays2 BgMove(20->14 d6 hit) BgMove(14->12 d2) ev154.1000 pip55/171
+bg 5 t33 p1 d1,1 plays11 BgMove(-1->0 d1) BgMove(-1->0 d1) BgMove(9->10 d1) BgMove(10->11 d1) ev-89.5000 pip55/167
+bg 5 t34 p0 d4,2 plays2 BgMove(12->8 d4) BgMove(3->1 d2) ev132.9000 pip49/167
+bg 5 t35 p1 d1,2 plays16 BgMove(17->18 d1) BgMove(17->19 d2) ev-90.2000 pip49/164
+bg 5 t36 p0 d5,1 plays2 BgMove(8->3 d5) BgMove(2->1 d1) ev139.3000 pip43/164
+bg 5 t37 p1 d1,3 plays24 BgMove(18->19 d1) BgMove(11->14 d3) ev-78.8000 pip43/160
+bg 5 t38 p0 d2,3 plays2 BgMove(1->-2 d2) BgMove(2->-2 d3) ev147.3000 pip38/160
+bg 5 t39 p1 d2,6 plays20 BgMove(14->16 d2) BgMove(16->22 d6) ev-75.8000 pip38/152
+bg 5 t40 p0 d3,3 plays1 BgMove(2->-2 d3) BgMove(2->-2 d3) BgMove(2->-2 d3) BgMove(2->-2 d3) ev144.5000 pip26/152
+bg 5 t41 p1 d3,6 plays13 BgMove(0->6 d6) BgMove(6->9 d3) ev-79.8000 pip26/143
+bg 5 t42 p0 d6,4 plays1 BgMove(3->-2 d6) BgMove(3->-2 d4) ev147.5000 pip18/143
+bg 5 t43 p1 d2,5 plays31 BgMove(9->11 d2) BgMove(11->16 d5) ev-79.8000 pip18/136
+bg 5 t44 p0 d4,5 plays1 BgMove(3->-2 d4) BgMove(3->-2 d5) ev148.5000 pip10/136
+bg 5 t45 p1 d1,5 plays20 BgMove(16->17 d1) BgMove(17->22 d5) ev-76.8000 pip10/130
+bg 5 t46 p0 d6,3 plays1 BgMove(1->-2 d6) BgMove(1->-2 d3) ev152.0000 pip6/130
+bg 5 t47 p1 d3,2 plays26 BgMove(0->3 d3) BgMove(3->5 d2) ev-76.8000 pip6/125
+bg 5 t48 p0 d2,3 plays1 BgMove(1->-2 d2) BgMove(1->-2 d3) ev143.6750 pip2/125
+bg 5 t49 p1 d5,2 plays30 BgMove(5->10 d5) BgMove(10->12 d2) ev-73.8000 pip2/118
+bg 5 t50 p0 d2,2 plays1 BgMove(1->-2 d2) ev100000.0000 pip0/118
+bg 5 winner 0 mult 3 key -2,0,0,0,0,0,0,0,0,0,0,0,-1,0,0,0,-2,-2,-2,-2,0,0,-2,-2|0,0|15,0
+bg 77 t0 p0 d4,4 plays52 BgMove(5->1 d4) BgMove(5->1 d4) BgMove(5->1 d4) BgMove(12->8 d4) ev26.1000 pip151/167
+bg 77 t1 p1 d2,4 plays18 BgMove(18->20 d2) BgMove(16->20 d4) ev2.0000 pip151/161
+bg 77 t2 p0 d3,6 plays17 BgMove(8->5 d3) BgMove(7->1 d6) ev32.5000 pip142/161
+bg 77 t3 p1 d1,2 plays17 BgMove(11->13 d2) BgMove(13->14 d1) ev-5.3750 pip142/158
+bg 77 t4 p0 d2,3 plays13 BgMove(5->3 d2) BgMove(7->4 d3) ev12.1000 pip137/158
+bg 77 t5 p1 d4,6 plays22 BgMove(0->4 d4 hit) BgMove(14->20 d6) ev26.5000 pip157/148
+bg 77 t6 p0 d3,3 plays19 BgMove(-1->21 d3) BgMove(3->0 d3 hit) BgMove(5->2 d3) BgMove(5->2 d3) ev8.1000 pip145/149
+bg 77 t7 p1 d2,2 plays1  ev-0.5000 pip145/149
+bg 77 t8 p0 d5,4 plays9 BgMove(12->7 d5) BgMove(21->17 d4) ev26.2250 pip136/149
+bg 77 t9 p1 d2,6 plays5 BgMove(-1->5 d6) BgMove(18->20 d2) ev-1.8000 pip136/141
+bg 77 t10 p0 d6,2 plays17 BgMove(12->6 d6) BgMove(23->21 d2) ev-0.3750 pip128/141
+bg 77 t11 p1 d6,2 plays21 BgMove(5->11 d6) BgMove(4->6 d2 hit) ev29.3000 pip146/133
+bg 77 t12 p0 d2,1 plays10 BgMove(-1->22 d2) BgMove(1->0 d1) ev1.1500 pip143/133
+bg 77 t13 p1 d1,4 plays17 BgMove(18->22 d4 hit) BgMove(22->23 d1 hit) ev31.7000 pip146/128
+bg 77 t14 p0 d3,6 plays1 BgMove(-1->21 d3) ev3.0500 pip143/128
+bg 77 t15 p1 d4,6 plays9 BgMove(6->10 d4) BgMove(10->16 d6) ev40.3000 pip143/118
+bg 77 t16 p0 d2,3 plays8 BgMove(-1->21 d3) BgMove(17->15 d2) ev3.9250 pip138/118
+bg 77 t17 p1 d5,1 plays5 BgMove(16->17 d1) BgMove(17->22 d5) ev33.5000 pip138/112
+bg 77 t18 p0 d3,3 plays19 BgMove(12->9 d3) BgMove(12->9 d3) BgMove(15->12 d3) BgMove(12->9 d3) ev15.3000 pip126/112
+bg 77 t19 p1 d6,3 plays7 BgMove(16->22 d6) BgMove(20->23 d3) ev31.1250 pip126/103
+bg 77 t20 p0 d6,1 plays14 BgMove(7->1 d6) BgMove(2->1 d1) ev-7.0000 pip119/103
+bg 77 t21 p1 d6,3 plays6 BgMove(16->22 d6) BgMove(20->23 d3) ev40.5000 pip119/94
+bg 77 t22 p0 d5,6 plays9 BgMove(9->4 d5) BgMove(9->3 d6) ev-10.0000 pip108/94
+bg 77 t23 p1 d4,5 plays5 BgMove(11->15 d4) BgMove(15->20 d5) ev40.0000 pip108/85
+bg 77 t24 p0 d6,1 plays17 BgMove(9->3 d6) BgMove(3->2 d1) ev4.8000 pip101/85
+bg 77 t25 p1 d4,4 plays9 BgMove(11->15 d4) BgMove(11->15 d4) BgMove(15->19 d4) BgMove(15->19 d4) ev63.8000 pip101/69
+bg 77 t26 p0 d5,6 plays4 BgMove(7->2 d5) BgMove(21->15 d6) ev-3.5750 pip90/69
+bg 77 t27 p1 d1,6 plays5 BgMove(11->12 d1) BgMove(12->18 d6) ev52.4000 pip90/62
+bg 77 t28 p0 d5,2 plays9 BgMove(15->10 d5) BgMove(2->0 d2) ev-0.2000 pip83/62
+bg 77 t29 p1 d1,5 plays8 BgMove(22->23 d1) BgMove(18->23 d5) ev54.4000 pip83/56
+bg 77 t30 p0 d5,2 plays9 BgMove(10->5 d5) BgMove(5->3 d2) ev15.2000 pip76/56
+bg 77 t31 p1 d3,5 plays6 BgMove(11->14 d3) BgMove(14->19 d5) ev57.3000 pip76/48
+bg 77 t32 p0 d3,5 plays3 BgMove(4->1 d3) BgMove(21->16 d5) ev7.5000 pip68/48
+bg 77 t33 p1 d5,4 plays6 BgMove(19->-2 d5) BgMove(20->-2 d4) ev62.3000 pip68/39
+bg 77 t34 p0 d4,1 plays9 BgMove(16->12 d4) BgMove(1->0 d1) ev5.0000 pip63/39
+bg 77 t35 p1 d5,5 plays1 BgMove(18->23 d5) BgMove(18->23 d5) BgMove(19->-2 d5) BgMove(19->-2 d5) ev59.5000 pip63/19
+bg 77 t36 p0 d3,4 plays6 BgMove(12->9 d3) BgMove(9->5 d4) ev-6.1250 pip56/19
+bg 77 t37 p1 d1,1 plays15 BgMove(20->21 d1 hit) BgMove(20->21 d1) BgMove(23->-2 d1) BgMove(23->-2 d1) ev96.7000 pip59/15
+bg 77 t38 p0 d4,5 plays3 BgMove(-1->20 d4) BgMove(5->0 d5) ev-72.4000 pip50/15
+bg 77 t39 p1 d6,2 plays2 BgMove(21->-2 d6) BgMove(22->-2 d2) ev102.8000 pip50/10
+bg 77 t40 p0 d1,6 plays4 BgMove(1->0 d1) BgMove(20->14 d6) ev-68.4000 pip43/10
+bg 77 t41 p1 d4,4 plays1 BgMove(21->-2 d4) BgMove(22->-2 d4) BgMove(23->-2 d4) BgMove(23->-2 d4) ev116.0000 pip43/3
+bg 77 t42 p0 d3,2 plays6 BgMove(3->0 d3) BgMove(14->12 d2) ev-73.0000 pip38/3
+bg 77 t43 p1 d5,5 plays1 BgMove(23->-2 d5) BgMove(23->-2 d5) BgMove(23->-2 d5) ev100000.0000 pip38/0
+bg 77 winner 1 mult 2 key 7,4,2,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0|0,0|0,15
+tt total 2 force null legal 5
+tt after [BgMove(7->1 d6)] remaining [5] legal 2
+tt undo 0 -2,0,0,0,0,5,0,3,0,0,0,-5,5,0,0,0,-3,0,-5,0,0,0,0,2|0,0|0,0

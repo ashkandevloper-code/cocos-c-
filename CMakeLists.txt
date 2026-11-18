@@ -65,6 +65,9 @@ else()
     add_library(${APP_NAME} SHARED ${all_code_files})
     add_subdirectory(${COCOS2DX_ROOT_PATH}/cocos/platform/android ${ENGINE_BINARY_PATH}/cocos/platform)
     target_link_libraries(${APP_NAME} -Wl,--whole-archive cpp_android_spec -Wl,--no-whole-archive)
+    # cocos2d-x 4.0 lists libcurl.a after libssl/libcrypto; GNU ld/gold then miss OpenSSL symbols.
+    # lld (shipped with NDK r21) resolves static archives order-independently.
+    set_property(TARGET ${APP_NAME} APPEND_STRING PROPERTY LINK_FLAGS " -fuse-ld=lld")
 endif()
 
 target_link_libraries(${APP_NAME} cocos2d)
@@ -75,6 +78,9 @@ target_include_directories(${APP_NAME}
     PRIVATE ${COCOS2DX_ROOT_PATH}/cocos/audio/include/
 )
 set_target_properties(${APP_NAME} PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+# Deterministic game physics: forbid FMA contraction (clang on arm64 fuses a*b+c by default), so the
+# fixed-step simulations stay bit-identical to the Dart VM and between phones.
+target_compile_options(${APP_NAME} PRIVATE -ffp-contract=off)
 
 setup_cocos_app_config(${APP_NAME})
 if(LINUX OR WINDOWS)
