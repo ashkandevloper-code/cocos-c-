@@ -65,9 +65,12 @@ else()
     add_library(${APP_NAME} SHARED ${all_code_files})
     add_subdirectory(${COCOS2DX_ROOT_PATH}/cocos/platform/android ${ENGINE_BINARY_PATH}/cocos/platform)
     target_link_libraries(${APP_NAME} -Wl,--whole-archive cpp_android_spec -Wl,--no-whole-archive)
-    # cocos2d-x 4.0 lists libcurl.a after libssl/libcrypto; GNU ld/gold then miss OpenSSL symbols.
-    # lld (shipped with NDK r21) resolves static archives order-independently.
-    set_property(TARGET ${APP_NAME} APPEND_STRING PROPERTY LINK_FLAGS " -fuse-ld=lld")
+    # cocos2d-x 4.0 puts libcurl.a after libssl.a/libcrypto.a on the link line, so gold (NDK r21 default)
+    # leaves curl's OpenSSL symbols undefined. lld is not an option: the prebuilt arm64 libcrypto.a has
+    # non-PIC references to OPENSSL_armcap_P that lld rejects in a shared object.
+    # CMAKE_CXX_STANDARD_LIBRARIES is emitted at the very end of the link line: repeat OpenSSL there.
+    set(NX_OPENSSL_DIR ${COCOS2DX_ROOT_PATH}/external/openssl/prebuilt/android/${ANDROID_ABI})
+    set(CMAKE_CXX_STANDARD_LIBRARIES "${CMAKE_CXX_STANDARD_LIBRARIES} ${NX_OPENSSL_DIR}/libssl.a ${NX_OPENSSL_DIR}/libcrypto.a")
 endif()
 
 target_link_libraries(${APP_NAME} cocos2d)
