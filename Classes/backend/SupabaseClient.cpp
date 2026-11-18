@@ -434,8 +434,42 @@ void SupabaseClient::updateUser(const Json& attrs, SbCallback cb) {
     authPost("user", attrs, false, AuthEvent::UserUpdated, std::move(cb), "PUT");
 }
 
-void SupabaseClient::resetPasswordForEmail(const std::string& email, SbCallback cb) {
-    authPost("recover", Json::obj({{"email", email}}), false, AuthEvent::SignedIn, std::move(cb));
+void SupabaseClient::resetPasswordForEmail(const std::string& email, SbCallback cb, const std::string& redirectTo) {
+    std::string path = "recover";
+    if (!redirectTo.empty()) path += "?redirect_to=" + urlEncode(redirectTo);
+    authPost(path, Json::obj({{"email", email}}), false, AuthEvent::SignedIn, std::move(cb));
+}
+
+void SupabaseClient::signInWithRefreshToken(const std::string& refreshToken, AuthEvent ev, SbCallback cb) {
+    HttpRequest r;
+    r.method = "POST";
+    r.url = url_ + "/auth/v1/token?grant_type=refresh_token";
+    r.headers = baseHeaders(true);
+    for (auto& h : r.headers) if (h.first == "Authorization") h.second = "Bearer " + anonKey_;
+    r.body = Json::obj({{"refresh_token", refreshToken}}).dump();
+    r.tag = "auth refresh-signin";
+    http_->send(r, [this, ev, cb](const HttpResponse& resp) {
+        SbResult res = toResult(resp);
+        if (res.ok && res.data.has("access_token")) setSession(AuthSession::fromTokenResponse(res.data, nowSec()), ev);
+        else if (!res.ok) normalizeAuthError(res);
+        if (cb) cb(res);
+    });
+}
+
+void SupabaseClient::adoptTokenResponse(const Json& j) {
+    if (j.has("access_token")) setSession(AuthSession::fromTokenResponse(j, nowSec()), AuthEvent::SignedIn);
+}
+
+void SupabaseClient::storageRemove(const std::string& bucket, const std::vector<std::string>& paths, SbCallback cb) {
+    HttpRequest r;
+    r.method = "DELETE";
+    r.url = url_ + "/storage/v1/object/" + bucket;
+    r.headers = baseHeaders(true);
+    Json arr = Json::array();
+    for (auto& p : paths) arr.push(Json(p));
+    r.body = Json::obj({{"prefixes", arr}}).dump();
+    r.tag = "storage remove " + bucket;
+    execute(r, std::move(cb));
 }
 
 void SupabaseClient::signOut(SbCallback cb) {

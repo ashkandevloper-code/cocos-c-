@@ -25,6 +25,8 @@ private:
     void verifyCode();
     void passwordSignIn();
     void continueGuest();
+    void signUp();
+    void forgot();
     void setError(const std::string& e);
     void setInfo(const std::string& i);
     std::string friendly(const std::string& key, int retryAfter);
@@ -33,12 +35,16 @@ private:
 
     bool sent_ = false;
     bool passwordMode_ = false;
+    bool signUp_ = false;   // create an account (email + username + password)
+    bool forgot_ = false;   // send a password-reset e-mail
     bool busy_ = false;
     int cooldown_ = 0;
     cocos2d::Node* form_ = nullptr;
     cocos2d::ui::EditBox* email_ = nullptr;
     cocos2d::ui::EditBox* code_ = nullptr;
     cocos2d::ui::EditBox* password_ = nullptr;
+    cocos2d::ui::EditBox* username_ = nullptr;
+    cocos2d::ui::EditBox* password2_ = nullptr;
     cocos2d::Label* error_ = nullptr;
     cocos2d::Label* info_ = nullptr;
 };

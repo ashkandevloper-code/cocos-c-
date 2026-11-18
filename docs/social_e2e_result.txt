@@ -1,0 +1,69 @@
+PASS 1-2 sign-up user A
+PASS 1-2 sign-up user B
+CREATED c4b6ae5c-d655-4c82-a364-226641343a2d 943f8296-5413-4d8a-8399-23590117abdf
+PASS profile save A
+PASS profile save B
+PASS unique username enforced
+PASS 3 upload avatar A
+PASS 3 set avatar A
+PASS 3 avatar public URL loads A
+PASS 3 upload avatar B
+PASS 3 set avatar B
+PASS 3 avatar public URL loads B
+PASS 14 A cannot upload into B's avatar folder
+PASS 14 A cannot point avatar at B's file
+PASS upload rejects non-image type
+PASS 4 A sees B's profile (B's own data)
+PASS cannot follow self
+PASS 5 A follows B
+PASS duplicate follow is idempotent
+PASS duplicate follow row rejected by DB
+PASS 6 counters A.following=1, B.followers=1
+PASS followers list of B contains A
+PASS following list of A contains B
+PASS 10 B got a 'follow' notification
+PASS 7 A signs in again
+PASS 7 follow state survives re-login
+PASS 8 A unfollows B
+PASS 9 A.following back to 0
+PASS B goes private
+PASS direct REST follow of private account blocked
+PASS private follower list hidden from non-follower
+PASS follow private -> pending
+PASS B sees A's request
+PASS A cancels request
+PASS cancelled request gone
+PASS B accepts request
+PASS A now follows private B and can view
+PASS A got 'follow_accepted'
+PASS B rejects request
+PASS 10 A opens DM with B
+PASS reopening DM reuses the same conversation
+PASS B opening DM with A gets the same conversation
+PASS 10 A sends 2 messages
+PASS 11 B receives messages in time order
+PASS timestamps are UTC ISO
+PASS not seen before B reads
+PASS seen after B reads
+PASS B has one (read) message notification
+PASS anonymous cannot read DMs
+PASS 12 A signs out
+PASS 12 A refresh token revoked after sign-out
+PASS 12 B signs out
+PASS 12 B refresh token revoked after sign-out
+PASS 13 messages persist after re-login
+PASS 13 profile + avatar persist
+PASS login with username (nx-login)
+PASS username login with wrong password fails
+PASS e-mail login with wrong password fails
+PASS 14 A cannot edit B's profile via REST
+PASS 14 B's bio unchanged
+PASS 14 A cannot delete B's follow rows
+PASS 14 non-member cannot read a chat
+PASS change password
+PASS old password no longer works
+PASS new password works
+PASS DM spam is rate-limited (30/min)
+
+65/65 passed
+CLEANUP c4b6ae5c-d655-4c82-a364-226641343a2d 943f8296-5413-4d8a-8399-23590117abdf

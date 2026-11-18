@@ -10,3 +10,4 @@ proj.android/local.properties
 *.apk
 *.keystore
 .DS_Store
+build-syntax/

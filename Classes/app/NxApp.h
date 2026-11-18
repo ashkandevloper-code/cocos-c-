@@ -1,6 +1,7 @@
 // Application services (Dart: ProviderScope + Riverpod providers): settings, online service, transports.
 #pragma once
 #include "backend/OnlineService.h"
+#include "backend/SocialService.h"
 #include "core/AppSettings.h"
 
 #include <memory>
@@ -20,6 +21,8 @@ public:
     AppSettings& settings() { return *settings_; }
     OnlineService& online() { return *online_; }
     IKeyValueStore& store();
+    SocialService& social() { return *social_; }
+    IHttp& http();
 
     /// Display name used in games / profile (local profile name or the account e-mail prefix).
     std::string playerName();
@@ -29,6 +32,8 @@ public:
     static void replace(cocos2d::Scene* s);  // top-level flow (intro -> auth -> hub)
     static void push(cocos2d::Scene* s);     // world / game on top of the hub
     static void pop();
+    /// Opens the Social world at a tab: "profile" | "search" | "inbox" | "alerts".
+    static void openSocial(const std::string& tab);
 
 private:
     NxApp() = default;
@@ -36,6 +41,7 @@ private:
     std::unique_ptr<CurlHttp> http_;
     std::unique_ptr<AppSettings> settings_;
     std::unique_ptr<OnlineService> online_;
+    std::unique_ptr<SocialService> social_;
     bool ready_ = false;
 };
 

@@ -111,7 +111,11 @@ public:
     void verifyOtp(const std::string& email, const std::string& token, const std::string& type, SbCallback cb);
     void refreshSession(SbCallback cb);
     void updateUser(const Json& attrs, SbCallback cb);
-    void resetPasswordForEmail(const std::string& email, SbCallback cb);
+    void resetPasswordForEmail(const std::string& email, SbCallback cb, const std::string& redirectTo = "");
+    /// Signs in from a refresh token (deep-link recovery / magic-link callbacks).
+    void signInWithRefreshToken(const std::string& refreshToken, AuthEvent ev, SbCallback cb);
+    /// Adopts a GoTrue token response obtained elsewhere (the nx-login Edge Function).
+    void adoptTokenResponse(const Json& tokenResponse);
     void signOut(SbCallback cb);
     /// Refreshes when the token expires within [marginSec]; calls [then] when the token is usable.
     void ensureFreshToken(std::function<void(bool ok)> then, int marginSec = 60);
@@ -122,6 +126,7 @@ public:
     void invokeFunction(const std::string& name, const Json& body, SbCallback cb);
     void storageUpload(const std::string& bucket, const std::string& path, const std::string& bytes,
                        const std::string& contentType, bool upsert, SbCallback cb);
+    void storageRemove(const std::string& bucket, const std::vector<std::string>& paths, SbCallback cb);
     std::string storagePublicUrl(const std::string& bucket, const std::string& path) const;
 
     // ---- Internals shared with Query / tests ----

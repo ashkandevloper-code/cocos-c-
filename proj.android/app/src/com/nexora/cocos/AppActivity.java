@@ -148,6 +148,59 @@ public class AppActivity extends Cocos2dxActivity {
         return false;
     }
 
+    /** Max edge of the stored profile photo; the result is a square JPEG (~30-120 KB). */
+    private static final int AVATAR_SIDE = 512;
+
+    /**
+     * Validates the picked file (JPG/PNG/WEBP only), applies the EXIF rotation, center-crops to a square,
+     * scales to AVATAR_SIDE and re-encodes as JPEG 85. Returns the cache file path or "error:<reason>".
+     */
+    private String processPicked(Uri uri) throws Exception {
+        String type = getContentResolver().getType(uri);
+        if (type != null && !(type.equals("image/jpeg") || type.equals("image/jpg") || type.equals("image/png") || type.equals("image/webp"))) {
+            return "error:type";
+        }
+        android.graphics.BitmapFactory.Options bounds = new android.graphics.BitmapFactory.Options();
+        bounds.inJustDecodeBounds = true;
+        try (InputStream in = getContentResolver().openInputStream(uri)) {
+            android.graphics.BitmapFactory.decodeStream(in, null, bounds);
+        }
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return "error:type";
+        String mime = bounds.outMimeType;
+        if (mime != null && !(mime.equals("image/jpeg") || mime.equals("image/png") || mime.equals("image/webp"))) return "error:type";
+        int sample = 1;
+        while (Math.min(bounds.outWidth, bounds.outHeight) / (sample * 2) >= AVATAR_SIDE) sample *= 2;
+        android.graphics.BitmapFactory.Options opts = new android.graphics.BitmapFactory.Options();
+        opts.inSampleSize = sample;
+        android.graphics.Bitmap bmp;
+        try (InputStream in = getContentResolver().openInputStream(uri)) {
+            bmp = android.graphics.BitmapFactory.decodeStream(in, null, opts);
+        }
+        if (bmp == null) return "error:read";
+        int rotate = 0;
+        try (InputStream in = getContentResolver().openInputStream(uri)) {
+            android.media.ExifInterface exif = new android.media.ExifInterface(in);
+            int o = exif.getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION, android.media.ExifInterface.ORIENTATION_NORMAL);
+            if (o == android.media.ExifInterface.ORIENTATION_ROTATE_90) rotate = 90;
+            else if (o == android.media.ExifInterface.ORIENTATION_ROTATE_180) rotate = 180;
+            else if (o == android.media.ExifInterface.ORIENTATION_ROTATE_270) rotate = 270;
+        } catch (Throwable ignored) { }
+        int side = Math.min(bmp.getWidth(), bmp.getHeight());
+        int x = (bmp.getWidth() - side) / 2, y = (bmp.getHeight() - side) / 2;
+        android.graphics.Matrix m = new android.graphics.Matrix();
+        float scale = side > AVATAR_SIDE ? (float) AVATAR_SIDE / side : 1f;
+        m.postScale(scale, scale);
+        if (rotate != 0) m.postRotate(rotate);
+        android.graphics.Bitmap out = android.graphics.Bitmap.createBitmap(bmp, x, y, side, side, m, true);
+        File f = new File(getCacheDir(), "nx_avatar_" + System.currentTimeMillis() + ".jpg");
+        try (OutputStream os = new FileOutputStream(f)) {
+            out.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, os);
+        }
+        if (out != bmp) out.recycle();
+        bmp.recycle();
+        return f.getAbsolutePath();
+    }
+
     private static void deliverPicked(final String path) {
         Cocos2dxHelper.runOnGLThread(new Runnable() {
             @Override public void run() { nativeOnImagePicked(path); }
@@ -163,17 +216,9 @@ public class AppActivity extends Cocos2dxActivity {
             return;
         }
         try {
-            File out = new File(getCacheDir(), "nx_pick_" + System.currentTimeMillis());
-            InputStream in = getContentResolver().openInputStream(data.getData());
-            OutputStream os = new FileOutputStream(out);
-            byte[] buf = new byte[16384];
-            int n;
-            while (in != null && (n = in.read(buf)) > 0) os.write(buf, 0, n);
-            if (in != null) in.close();
-            os.close();
-            deliverPicked(out.getAbsolutePath());
-        } catch (Exception e) {
-            deliverPicked("");
+            deliverPicked(processPicked(data.getData()));
+        } catch (Throwable e) {
+            deliverPicked("error:read");
         }
     }
 }

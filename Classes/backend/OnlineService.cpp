@@ -152,6 +152,23 @@ void OnlineService::registerEmail(const std::string& email, const std::string& p
 }
 
 void OnlineService::signInEmail(const std::string& idOrEmail, const std::string& password, std::function<void(bool)> cb) {
+    if (isUsernameLogin(idOrEmail)) {
+        // Username sign-in goes through the nx-login Edge Function: it resolves internal accounts and e-mail
+        // accounts by username server-side, so no e-mail address is ever exposed to the client.
+        std::string u = lower(trim(idOrEmail));
+        runAuth(
+            [this, u, password](SbCallback done) {
+                main_->invokeFunction("nx-login", Json::obj({{"username", u}, {"password", password}}),
+                                      [this, done](const SbResult& r) {
+                                          if (r.ok && r.data.has("access_token")) main_->adoptTokenResponse(r.data);
+                                          SbResult out = r;
+                                          if (r.ok && !r.data.has("access_token")) { out.ok = false; out.error = "invalid_login"; }
+                                          done(out);
+                                      });
+            },
+            cb);
+        return;
+    }
     std::string e = loginEmail(idOrEmail), p = loginPassword(idOrEmail, password);
     runAuth([this, e, p](SbCallback done) { main_->signInWithPassword(e, p, done); }, cb);
 }
@@ -170,7 +187,52 @@ void OnlineService::changePassword(const std::string& newPassword, std::function
 
 void OnlineService::resetPassword(const std::string& email, std::function<void(bool)> cb) {
     std::string e = trim(email);
-    runAuth([this, e](SbCallback done) { main_->resetPasswordForEmail(e, done); }, cb);
+    runAuth([this, e](SbCallback done) { main_->resetPasswordForEmail(e, done, emailRedirect); }, cb);
+}
+
+std::map<std::string, std::string> OnlineService::parseLinkParams(const std::string& url) {
+    std::map<std::string, std::string> out;
+    auto decode = [](const std::string& v) {
+        std::string o;
+        for (size_t i = 0; i < v.size(); ++i) {
+            if (v[i] == '%' && i + 2 < v.size()) {
+                o += static_cast<char>(std::stoi(v.substr(i + 1, 2), nullptr, 16));
+                i += 2;
+            } else o += v[i] == '+' ? ' ' : v[i];
+        }
+        return o;
+    };
+    for (char sep : {'?', '#'}) {
+        size_t p = url.find(sep);
+        if (p == std::string::npos) continue;
+        std::string q = url.substr(p + 1);
+        if (sep == '?') q = q.substr(0, q.find('#'));
+        size_t i = 0;
+        while (i <= q.size()) {
+            size_t amp = q.find('&', i);
+            std::string kv = q.substr(i, amp == std::string::npos ? std::string::npos : amp - i);
+            size_t eq = kv.find('=');
+            if (eq != std::string::npos) out[kv.substr(0, eq)] = decode(kv.substr(eq + 1));
+            if (amp == std::string::npos) break;
+            i = amp + 1;
+        }
+    }
+    return out;
+}
+
+std::string OnlineService::handleAuthDeepLink(const std::string& url, std::function<void(bool, const std::string&)> cb) {
+    auto prm = parseLinkParams(url);
+    std::string type = prm.count("type") ? prm["type"] : "";
+    if (!main_ || !prm.count("refresh_token")) {
+        if (prm.count("error_description")) lastError_ = prm["error_description"];
+        if (cb) cb(false, type);
+        return "";
+    }
+    std::string rt = prm["refresh_token"];
+    if (type.empty()) type = "magiclink";
+    runAuth([this, rt](SbCallback done) { main_->signInWithRefreshToken(rt, AuthEvent::SignedIn, done); },
+            [cb, type](bool ok) { if (cb) cb(ok, type); });
+    return type;
 }
 
 void OnlineService::signOut(std::function<void()> cb) {
@@ -207,7 +269,15 @@ void OnlineService::rpc(const std::string& fn, const Json& params, SbCallback cb
         if (cb) cb(r);
         return;
     }
-    main_->rpc(fn, params, cb);
+    main_->ensureFreshToken([this, fn, params, cb](bool ok) {
+        if (!ok && !main_->hasSession()) {
+            SbResult r;
+            r.error = "offline";
+            if (cb) cb(r);
+            return;
+        }
+        main_->rpc(fn, params, cb);
+    });
 }
 
 void OnlineService::tick(int64_t nowMs) {

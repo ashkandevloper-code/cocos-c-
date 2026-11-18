@@ -69,12 +69,21 @@ public:
     void signInEmail(const std::string& idOrEmail, const std::string& password, std::function<void(bool)> cb);
     void changePassword(const std::string& newPassword, std::function<void(bool)> cb);
     void resetPassword(const std::string& email, std::function<void(bool)> cb);
+    /// Handles nexora://login-callback#access_token=..&refresh_token=..&type=recovery|magiclink|signup.
+    /// Returns the link type ("" when the link carries no session). [cb] fires after the session is set.
+    std::string handleAuthDeepLink(const std::string& url, std::function<void(bool ok, const std::string& type)> cb);
+    static std::map<std::string, std::string> parseLinkParams(const std::string& url);
     void signOut(std::function<void()> cb = nullptr);
 
     /// Registers this player on the games project (profile mirror row). Needed before every games RPC.
     void gamesHello(bool force, std::function<void(bool)> cb = nullptr);
     /// RPC on the games project (calls gamesHello first). Fails with "offline" without a session.
     void grpc(const std::string& fn, const Json& params, SbCallback cb);
+    /// RPC on the main project without a session (anon role), e.g. username_available before sign-up.
+    void rpcAnon(const std::string& fn, const Json& params, SbCallback cb) {
+        if (!main_) { SbResult r; r.error = "not_configured"; if (cb) cb(r); return; }
+        main_->rpc(fn, params, cb);
+    }
     /// RPC on the main project.
     void rpc(const std::string& fn, const Json& params, SbCallback cb);
 

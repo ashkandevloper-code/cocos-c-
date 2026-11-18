@@ -3,6 +3,7 @@
 #include "app/NxApp.h"
 #include "core/Worlds.h"
 #include "ui/Widgets.h"
+#include "scenes/SocialScenes.h"
 
 #include <regex>
 
@@ -86,6 +87,61 @@ void AuthScene::build() {
     title->setPosition(cx, y);
     form_->addChild(title);
     y -= 60;
+    if (signUp_ || forgot_) {
+        auto sub2 = makeText(signUp_ ? tx("حساب تازه بساز: ایمیل، نام کاربری و رمز (حداقل ۸ کاراکتر).",
+                                          "Create an account: e-mail, username and a password (8+ characters).")
+                                     : tx("ایمیل حسابت را وارد کن تا لینک تغییر رمز برایت فرستاده شود. لینک را روی همین گوشی باز کن.",
+                                          "Enter your account e-mail and we'll send a reset link. Open it on this phone."),
+                             24, color::muted, Weight::Regular, vs.width - 120);
+        sub2->setPosition(cx, y);
+        form_->addChild(sub2);
+        y -= 90;
+        const Size f(vs.width - 120, 84);
+        std::string keep = email_ ? email_->getText() : "";
+        email_ = makeInput(f, tx("ایمیل", "E-mail"), false, cocos2d::ui::EditBox::InputMode::EMAIL_ADDRESS);
+        email_->setText(keep.c_str());
+        email_->setPosition(Vec2(cx, y));
+        form_->addChild(email_);
+        y -= 104;
+        code_ = nullptr;
+        password_ = username_ = password2_ = nullptr;
+        if (signUp_) {
+            username_ = makeInput(f, tx("نام کاربری (انگلیسی، ۳ تا ۲۰)", "Username (3–20, a-z 0-9 _ .)"));
+            username_->setMaxLength(20);
+            username_->setPosition(Vec2(cx, y));
+            form_->addChild(username_);
+            y -= 104;
+            password_ = makeInput(f, tx("رمز عبور", "Password"), true);
+            password_->setPosition(Vec2(cx, y));
+            form_->addChild(password_);
+            y -= 104;
+            password2_ = makeInput(f, tx("تکرار رمز عبور", "Repeat password"), true);
+            password2_->setPosition(Vec2(cx, y));
+            form_->addChild(password2_);
+            y -= 110;
+        }
+        auto go = NxButton::create(signUp_ ? tx("ساخت حساب", "Create account") : tx("ارسال لینک تغییر رمز", "Send reset link"),
+                                   Size(f.width, 86), [this] { if (signUp_) signUp(); else forgot(); });
+        go->setPosition(cx, y);
+        form_->addChild(go);
+        y -= 96;
+        auto back = NxButton::create(tx("بازگشت به ورود", "Back to sign in"), Size(f.width, 70), [this] {
+            signUp_ = forgot_ = false;
+            passwordMode_ = true;
+            setError("");
+            build();
+        }, ButtonStyle::Ghost);
+        back->setPosition(cx, y);
+        form_->addChild(back);
+        y -= 80;
+        error_ = makeText(" ", 24, color::danger, Weight::Bold, vs.width - 100);
+        error_->setPosition(cx, y);
+        form_->addChild(error_);
+        info_ = makeText(" ", 22, color::muted, Weight::Regular, vs.width - 100);
+        info_->setPosition(cx, y - 60);
+        form_->addChild(info_);
+        return;
+    }
     auto sub = makeText(passwordMode_ ? tx("با ایمیل یا نام کاربری و رمز وارد شو.", "Sign in with e-mail or username and password.")
                                       : tx("ابتدا ایمیل واقعی‌ات را تأیید کن؛ سپس وارد حساب می‌شوی.",
                                            "Verify your real e-mail first; then you enter your account."),
@@ -112,6 +168,22 @@ void AuthScene::build() {
         go->setPosition(cx, y);
         form_->addChild(go);
         y -= 100;
+        float hw = (field.width - 16) / 2;
+        auto create = NxButton::create(tx("ساخت حساب", "Create account"), Size(hw, 64), [this] {
+            signUp_ = true;
+            setError("");
+            build();
+        }, ButtonStyle::Secondary);
+        create->setPosition(cx - hw / 2 - 8, y);
+        form_->addChild(create);
+        auto lost = NxButton::create(tx("فراموشی رمز", "Forgot password"), Size(hw, 64), [this] {
+            forgot_ = true;
+            setError("");
+            build();
+        }, ButtonStyle::Ghost);
+        lost->setPosition(cx + hw / 2 + 8, y);
+        form_->addChild(lost);
+        y -= 84;
     } else {
         if (sent_) {
             code_ = makeInput(field, tx("کد ۶ رقمی", "6-digit code"), false, cocos2d::ui::EditBox::InputMode::NUMERIC);
@@ -271,6 +343,80 @@ void AuthScene::passwordSignIn() {
     });
 }
 
+void AuthScene::signUp() {
+    if (busy_ || !username_ || !password_ || !password2_) return;
+    std::string email = email_->getText(), user = username_->getText(), pw = password_->getText(), pw2 = password2_->getText();
+    while (!user.empty() && user.back() == ' ') user.pop_back();
+    while (!user.empty() && user.front() == ' ') user.erase(0, 1);
+    for (auto& c : user) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    if (!std::regex_match(email, std::regex("^\\s*[^@\\s]+@[^@\\s]+\\.[^@\\s]+\\s*$"))) {
+        setError(tx("ایمیل معتبر وارد کن.", "Enter a valid email address."));
+        return;
+    }
+    if (!std::regex_match(user, std::regex("^[a-z0-9_.]{3,20}$"))) {
+        setError(tx("نام کاربری ۳ تا ۲۰ حرف انگلیسی کوچک، عدد، _ یا . باشد.", "Username: 3–20 lowercase letters, digits, _ or ."));
+        return;
+    }
+    if (pw.size() < 8) { setError(tx("رمز باید حداقل ۸ کاراکتر باشد.", "Password must be at least 8 characters.")); return; }
+    if (pw != pw2) { setError(tx("دو رمز یکسان نیستند.", "The passwords don't match.")); return; }
+    auto& online = NxApp::get().online();
+    if (!online.configured()) { setError(friendly("not_configured", -1)); return; }
+    busy_ = true;
+    setError("");
+    setInfo(tx("در حال ساخت حساب…", "Creating your account…"));
+    retain();
+    online.rpcAnon("username_available", Json::obj({{"p_name", user}}), [this, email, user, pw](const SbResult& av) {
+        if (av.ok && av.data.isBool() && !av.data.asBool()) {
+            busy_ = false;
+            setInfo("");
+            setError(tx("این نام کاربری قبلاً گرفته شده.", "That username is taken."));
+            release();
+            return;
+        }
+        NxApp::get().online().registerEmail(email, pw, user, [this](bool ok) {
+            busy_ = false;
+            auto& on = NxApp::get().online();
+            if (ok && on.isOnline()) {
+                setInfo("");
+                afterSignIn();
+            } else if (ok) {
+                setInfo(tx("حساب ساخته شد. ایمیلت را تأیید کن و بعد وارد شو.", "Account created. Confirm your e-mail, then sign in."));
+            } else {
+                setInfo("");
+                std::string e = on.lastError();
+                if (e == "email_taken") setError(tx("این ایمیل قبلاً ثبت شده؛ وارد شو.", "That e-mail is already registered; sign in."));
+                else if (e == "weak_password") setError(tx("رمز ضعیف است؛ حداقل ۸ کاراکتر.", "Password too weak; use 8+ characters."));
+                else setError(friendly(e, on.lastRetryAfter()));
+            }
+            release();
+        });
+    });
+}
+
+void AuthScene::forgot() {
+    if (busy_) return;
+    std::string email = email_->getText();
+    if (!std::regex_match(email, std::regex("^\\s*[^@\\s]+@[^@\\s]+\\.[^@\\s]+\\s*$"))) {
+        setError(tx("ایمیل معتبر وارد کن.", "Enter a valid email address."));
+        return;
+    }
+    auto& online = NxApp::get().online();
+    if (!online.configured()) { setError(friendly("not_configured", -1)); return; }
+    busy_ = true;
+    setError("");
+    retain();
+    online.resetPassword(email, [this](bool ok) {
+        busy_ = false;
+        auto& on = NxApp::get().online();
+        // Same answer whether or not the e-mail exists (no account enumeration).
+        if (ok || on.lastError() == "user_not_found")
+            setInfo(tx("اگر این ایمیل حساب داشته باشد، لینک تغییر رمز فرستاده شد. لینک را روی همین گوشی باز کن.",
+                       "If that e-mail has an account, a reset link is on its way. Open it on this phone."));
+        else setError(friendly(on.lastError(), on.lastRetryAfter()));
+        release();
+    });
+}
+
 void AuthScene::afterSignIn() {
     auto& app = NxApp::get();
     app.settings().setAuthMode("email");
@@ -420,6 +566,9 @@ void HubScene::openWorld(const std::string& id) {
         NxApp::push(createArcadeScene());
         return;
     }
+    if (id == "personal_orbit") { NxApp::openSocial("profile"); return; }
+    if (id == "orbit_network") { NxApp::openSocial("inbox"); return; }
+    if (id == "nova_gallery" || id == "social_station") { NxApp::openSocial("search"); return; }
     if (Scene* s = createWorldScene(id)) {
         NxApp::push(s);
         return;
@@ -486,6 +635,10 @@ void SettingsScene::rebuild() {
     row(tx("حرف‌زدن اوراکل", "ORACLE talk"), onOff(st.oracleTalk()), [&st] { st.setOracleTalk(!st.oracleTalk()); });
 
     auto& on = NxApp::get().online();
+    if (on.isOnline() && !on.isGuest()) {
+        row(tx("پروفایل من", "My profile"), tx("باز کن", "Open"), [] { NxApp::openSocial("profile"); });
+        row(tx("رمز عبور", "Password"), tx("تغییر", "Change"), [] { NxApp::push(ChangePasswordScene::create(false)); });
+    }
     if (on.isOnline()) {
         row(tx("حساب: ", "Account: ") + on.email(), tx("خروج", "Sign out"), [] {
             NxApp::get().online().signOut([] {
