@@ -1,0 +1,7 @@
+// Generated at configure time from the build environment. Do not edit.
+#pragma once
+#define NX_CFG_SUPABASE_URL "@NX_SUPABASE_URL@"
+#define NX_CFG_SUPABASE_ANON_KEY "@NX_SUPABASE_ANON_KEY@"
+#define NX_CFG_GAMES_SUPABASE_URL "@NX_GAMES_SUPABASE_URL@"
+#define NX_CFG_GAMES_SUPABASE_ANON_KEY "@NX_GAMES_SUPABASE_ANON_KEY@"
+#define NX_CFG_LIVEKIT_URL "@NX_LIVEKIT_URL@"

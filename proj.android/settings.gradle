@@ -1,0 +1,6 @@
+// cocos2d-x engine sources live in ../cocos2d (tools/fetch_cocos.sh) unless COCOS2DX_ROOT is set.
+def cocosRoot = System.getenv('COCOS2DX_ROOT') ?: new File(settingsDir, '../cocos2d').absolutePath
+include ':libcocos2dx'
+project(':libcocos2dx').projectDir = new File(cocosRoot, 'cocos/platform/android/libcocos2dx')
+include ':nexora'
+project(':nexora').projectDir = new File(settingsDir, 'app')

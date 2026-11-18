@@ -1,0 +1,182 @@
+name: NEXORA cocos2d-x Android
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+env:
+  # Public values only (anon/publishable keys ship inside the app; RLS protects the data).
+  SUPABASE_URL: https://eisstodgncimypdawisy.supabase.co
+  SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVpc3N0b2RnbmNpbXlwZGF3aXN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQyMjkwMTAsImV4cCI6MjEwOTgwNTAxMH0.uEPldAQjJdRyZTGXaz_OpFR7WpFXMiPXlW1S34cR3p8
+  LIVEKIT_URL: wss://nexora-space-xzjzlfyl.livekit.cloud
+  GAMES_SUPABASE_URL: https://eyzafhrefnqlwcjpcdyg.supabase.co
+  GAMES_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5emFmaHJlZm5xbHdjanBjZHlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ4OTUzNjcsImV4cCI6MjExMDQ3MTM2N30.YfdEhbEbvbQ738snwc5C47LYx-NYRXywX66dgMEZh-M
+  # Pinned toolchain for cocos2d-x 4.0
+  COCOS_TAG: cocos2d-x-4.0
+  NDK_VERSION: 21.4.7075529     # r21e
+  CMAKE_SDK_VERSION: 3.10.2.4988404
+  ANDROID_PLATFORM: android-30
+  BUILD_TOOLS: 30.0.3
+
+jobs:
+  core-tests:
+    name: Host core build + unit tests + cocos API syntax check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install host toolchain
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ninja-build g++ cmake libglew-dev libglfw3-dev libcurl4-openssl-dev libfontconfig1-dev
+          g++ --version | head -1; cmake --version | head -1
+
+      - name: Build engine-independent core + tests
+        run: |
+          cmake -S tests -B build-host -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          cmake --build build-host -j4
+
+      - name: Run unit tests
+        run: ./build-host/nx_tests
+
+      - name: Cache cocos2d-x
+        uses: actions/cache@v4
+        with:
+          path: cocos2d
+          key: cocos2d-x-4.0-${{ hashFiles('tools/fetch_cocos.sh') }}
+
+      - name: Fetch cocos2d-x 4.0 (+ third-party libs)
+        run: tools/fetch_cocos.sh "$PWD/cocos2d"
+
+      - name: Syntax-check scene/UI/platform code against cocos2d-x headers
+        run: tools/syntax_check.sh "$PWD/cocos2d"
+
+  android:
+    name: Android APK (cocos2d-x 4.0, NDK r21e)
+    needs: core-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache cocos2d-x
+        uses: actions/cache@v4
+        with:
+          path: cocos2d
+          key: cocos2d-x-4.0-${{ hashFiles('tools/fetch_cocos.sh') }}
+
+      - name: Fetch cocos2d-x 4.0 (+ third-party libs)
+        run: tools/fetch_cocos.sh "$PWD/cocos2d"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+
+      - name: Install Android SDK components (NDK r21e, CMake 3.10.2, platform 30)
+        run: |
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          [ -x "$SDKM" ] || SDKM="$(ls -d $ANDROID_HOME/cmdline-tools/*/bin/sdkmanager | head -1)"
+          # Recent cmdline-tools need Java 17; Gradle/AGP 4.1 below runs on Java 11.
+          J17="${JAVA_HOME_17_X64:-${JAVA_HOME_21_X64:-$JAVA_HOME}}"
+          yes | JAVA_HOME="$J17" "$SDKM" --licenses > /dev/null || true
+          JAVA_HOME="$J17" "$SDKM" --install "ndk;$NDK_VERSION" "cmake;$CMAKE_SDK_VERSION" "platforms;$ANDROID_PLATFORM" "build-tools;$BUILD_TOOLS" > /tmp/sdk.log
+          tail -3 /tmp/sdk.log
+          ls "$ANDROID_HOME/ndk" "$ANDROID_HOME/cmake"
+          echo "sdk.dir=$ANDROID_HOME" > proj.android/local.properties
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-6.7.1-agp-4.1.3-${{ hashFiles('proj.android/**/*.gradle', 'proj.android/gradle.properties') }}
+
+      - name: Generate config header from workflow env
+        run: python3 tools/gen_config.py
+
+      - name: Signing key
+        env:
+          NEXORA_COCOS_KEYSTORE_B64: ${{ secrets.NEXORA_COCOS_KEYSTORE_B64 }}
+          NEXORA_COCOS_KEYSTORE_PASSWORD: ${{ secrets.NEXORA_COCOS_KEYSTORE_PASSWORD }}
+        run: |
+          mkdir -p ~/.nexora
+          if [ -n "$NEXORA_COCOS_KEYSTORE_B64" ]; then
+            echo "$NEXORA_COCOS_KEYSTORE_B64" | base64 -d > ~/.nexora/release.keystore
+            echo "NX_KS_PASS=$NEXORA_COCOS_KEYSTORE_PASSWORD" >> $GITHUB_ENV
+            echo "Using keystore from repository secret"
+          else
+            echo "NX_KS_PASS=nexora-ci" >> $GITHUB_ENV
+          fi
+
+      - name: Restore CI signing key (stable across runs when no secret is set)
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.nexora/release.keystore
+          key: nexora-cocos-signing-v1
+
+      - name: Create CI signing key (first run only)
+        run: |
+          if [ ! -f ~/.nexora/release.keystore ]; then
+            keytool -genkeypair -v -keystore ~/.nexora/release.keystore -storepass "$NX_KS_PASS" -keypass "$NX_KS_PASS" \
+              -alias nexora -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=NEXORA, O=NEXORA, C=IR"
+            echo "NEW_KEY=true" >> $GITHUB_ENV
+          fi
+
+      - name: Save CI signing key
+        if: env.NEW_KEY == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.nexora/release.keystore
+          key: nexora-cocos-signing-v1
+
+      - name: Build release APK (arm64-v8a + armeabi-v7a)
+        working-directory: proj.android
+        env:
+          COCOS2DX_ROOT: ${{ github.workspace }}/cocos2d
+          NX_VERSION_CODE: ${{ github.run_number }}
+          NX_VERSION_NAME: 1.0.${{ github.run_number }}
+        run: |
+          chmod +x gradlew
+          ./gradlew --version
+          ./gradlew assembleRelease --no-daemon --stacktrace --warning-mode all \
+            -PRELEASE_STORE_FILE=$HOME/.nexora/release.keystore -PRELEASE_STORE_PASSWORD="$NX_KS_PASS" \
+            -PRELEASE_KEY_ALIAS=nexora -PRELEASE_KEY_PASSWORD="$NX_KS_PASS"
+          ls -la app/build/outputs/apk/release/
+
+      - name: Verify APK
+        run: |
+          APK=$(ls proj.android/app/build/outputs/apk/release/*.apk | head -1)
+          cp "$APK" nexora-cocos-${{ github.run_number }}.apk
+          BT="$ANDROID_HOME/build-tools/$BUILD_TOOLS"
+          "$BT/aapt" dump badging nexora-cocos-${{ github.run_number }}.apk | head -5
+          unzip -l nexora-cocos-${{ github.run_number }}.apk | grep -E "lib/(arm64-v8a|armeabi-v7a)/libnexora.so"
+          "$BT/apksigner" verify --print-certs nexora-cocos-${{ github.run_number }}.apk | head -3
+          ls -la nexora-cocos-${{ github.run_number }}.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nexora-cocos-apk-${{ github.run_number }}
+          path: nexora-cocos-${{ github.run_number }}.apk
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: cocos-${{ github.run_number }}
+          name: NEXORA cocos2d-x build ${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          body: |
+            Automated build of `${{ github.sha }}` (cocos2d-x 4.0, NDK r21e, arm64-v8a + armeabi-v7a).
+            vc=${{ github.run_number }}
+          files: nexora-cocos-${{ github.run_number }}.apk
