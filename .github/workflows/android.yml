@@ -259,6 +259,29 @@ jobs:
           set -o pipefail
           flutter test --reporter expanded 2>&1 | tee test.txt
 
+      # Failed test logs remain an artifact, but a compact failure excerpt is
+      # also a check annotation so reviewers can diagnose a run without downloading it.
+      - name: Annotate test failures
+        if: failure() && env.KEEPALIVE != 'true'
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          log = Path('test.txt')
+          if not log.exists():
+              print('::error title=Flutter tests::No test log was produced')
+              raise SystemExit(0)
+          lines = log.read_text(errors='replace').splitlines()
+          failures = [i for i, s in enumerate(lines) if '[E]' in s or re.search(r'^(Error:|.*Some tests failed)', s)]
+          if not failures:
+              failures = [max(0, len(lines)-35)]
+          for n, i in enumerate(failures[:8], 1):
+              chunk = ' | '.join(lines[max(0, i-1):i+24])[:6500]
+              # Actions command syntax must not be injectable from test output.
+              chunk = chunk.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A').replace('::', ': :')
+              print(f'::error title=Flutter test failure {n}::{chunk}')
+          PY
+
       - name: Build split-per-ABI release APKs
         if: env.KEEPALIVE != 'true'
         run: |
