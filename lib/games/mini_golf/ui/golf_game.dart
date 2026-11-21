@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../arcade_kit/arcade_controls.dart';
 import '../../arcade_kit/arcade_fx.dart';
@@ -139,7 +138,7 @@ class _GolfGameState extends ArcadeLoopState<GolfGame> {
     final double clock = g.millClock;
     if (tn != null) unawaited(tn!.send(<String, dynamic>{'a': 'shot', 'ang': ang, 'p': p, 'clk': clock}));
     g.shoot(ang, p, clock: clock);
-    HapticFeedback.mediumImpact();
+    l.hapticMedium();
     _trail.clear();
   }
 
@@ -239,7 +238,7 @@ class _GolfGameState extends ArcadeLoopState<GolfGame> {
           fx.confetti(at, count: 30);
           fx.ring(at, skin.accent2, size: 16);
           _say(_scoreText(e.strokes, g.course[holeAt].par));
-          HapticFeedback.heavyImpact();
+          l.hapticHeavy();
         case 'pickup':
           _say(_scoreText(e.strokes, g.course[holeAt].par));
         case 'lip':

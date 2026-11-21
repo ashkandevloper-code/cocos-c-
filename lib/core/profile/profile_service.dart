@@ -560,7 +560,7 @@ class ProfileService extends ChangeNotifier {
 
   List<AchievementDef> _checkAchievements() {
     final out = <AchievementDef>[];
-    for (final a in kAchievements) {
+    for (final a in kAvailableAchievements) {
       if (achievements.contains(a.id)) continue;
       if (a.check(this)) {
         achievements.add(a.id);

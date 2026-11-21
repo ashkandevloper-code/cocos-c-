@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:nexora/core/theme/nx_theme.dart';
 import 'package:nexora/core/widgets/nx_widgets.dart';
 import 'package:nexora/games/core/game_contract.dart';
@@ -195,7 +194,7 @@ class _MafiaOnlineViewState extends State<MafiaOnlineView> {
     _apply(m);
     if (m.replay) return;
     if (_stage != before || _e.day != dayBefore) {
-      if (_l.soundOn) HapticFeedback.mediumImpact();
+      _l.hapticMedium();
     }
     setState(() {});
     _checkOver();

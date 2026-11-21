@@ -10,6 +10,7 @@ import 'package:nexora/games/core/game_contract.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/bm_engine.dart';
+import '../core/fs_custom_team.dart';
 import '../ui/bm_view.dart';
 import 'fs_formation_select.dart';
 import 'fs_game_bar.dart';
@@ -57,9 +58,13 @@ class _FsIntroFlowState extends State<FsIntroFlow> {
       final SharedPreferences p = await SharedPreferences.getInstance();
       final String t = p.getString('bm.team') ?? kDefaultTeam;
       final int f = p.getInt('bm.form') ?? 0;
+      if (fsCustomOwner(t) != null && GemShop.instance.customTeamId == null) {
+        await GemShop.instance.refreshCustom();
+      }
       if (!mounted) return;
       setState(() {
-        _teams[0] = GemShop.instance.usableTeam(kBmTeams.any((BmTeam x) => x.id == t) ? t : kDefaultTeam);
+        _teams[0] = GemShop.instance.usableTeam(
+            kBmTeams.any((BmTeam x) => x.id == t) || fsCustomOwner(t) != null ? t : kDefaultTeam);
         if (_teams[1] == _teams[0]) _teams[1] = _randomTeam(_teams[0]);
         _forms[0] = f.clamp(0, math.max(0, kBmForms.length - 1)).toInt();
       });

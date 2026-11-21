@@ -52,7 +52,7 @@ class AchievementsTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final ProfileService p = ref.watch(profileProvider);
     final NxThemeColors visual = NxThemeColors.of(context);
-    final int got = kAchievements
+    final int got = kAvailableAchievements
         .where((AchievementDef a) => p.achievements.contains(a.id))
         .length;
     return CustomScrollView(slivers: <Widget>[
@@ -72,17 +72,17 @@ class AchievementsTab extends ConsumerWidget {
                           poDigits(
                               context,
                               context.tx(
-                                  '$got از ${kAchievements.length} دستاورد',
-                                  '$got of ${kAchievements.length} achievements')),
+                                  '$got از ${kAvailableAchievements.length} دستاورد',
+                                  '$got of ${kAvailableAchievements.length} achievements')),
                           style: TextStyle(
                               fontWeight: FontWeight.w900,
                               color: PoColors.ink(context),
                               fontSize: 16)),
                       const SizedBox(height: 8),
                       PoProgressBar(
-                        value: kAchievements.isEmpty
+                        value: kAvailableAchievements.isEmpty
                             ? 0
-                            : got / kAchievements.length,
+                            : got / kAvailableAchievements.length,
                       ),
                     ]),
               ),
@@ -101,7 +101,7 @@ class AchievementsTab extends ConsumerWidget {
           ),
           delegate: SliverChildBuilderDelegate(
             (BuildContext ctx, int i) {
-              final AchievementDef a = kAchievements[i];
+              final AchievementDef a = kAvailableAchievements[i];
               final bool unlocked = p.achievements.contains(a.id);
               return PoCard(
                 padding: const EdgeInsets.all(8),
@@ -128,7 +128,7 @@ class AchievementsTab extends ConsumerWidget {
                 ]),
               );
             },
-            childCount: kAchievements.length,
+            childCount: kAvailableAchievements.length,
           ),
         ),
       ),

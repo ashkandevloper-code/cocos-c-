@@ -1,7 +1,6 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:nexora/core/theme/nx_theme.dart';
 import 'package:nexora/games/core/game_contract.dart';
 
@@ -268,11 +267,11 @@ class _LudoGameState extends State<LudoGame> with TickerProviderStateMixin {
       Duration(milliseconds: _l.reducedMotion ? (ms * 0.6).round() : ms));
 
   void _haptic({bool heavy = false}) {
-    if (!_l.soundOn) return;
+    if (!_l.hapticsOn) return;
     if (heavy) {
-      HapticFeedback.mediumImpact();
+      _l.hapticMedium();
     } else {
-      HapticFeedback.selectionClick();
+      _l.hapticSelection();
     }
   }
 

@@ -9,6 +9,7 @@ import 'package:nexora/core/widgets/user_avatar.dart';
 
 import 'fs_intro_data.dart';
 import 'fs_intro_ui.dart';
+import 'fs_team_art.dart';
 
 /// Seconds the score table stays up (reference recordings: 20 -> 0, then the host's result screen).
 const int kFsScoreTableSeconds = 20;
@@ -123,8 +124,7 @@ class FsScoreTable extends StatelessWidget {
                 child: r.avatar != null
                     ? NxUserAvatar(avatar: r.avatar, name: r.name, size: 36)
                     : ClipOval(
-                        child: Image.asset(r.crest, fit: BoxFit.contain, cacheWidth: 96,
-                            errorBuilder: (_, __, ___) => const SizedBox()),
+                        child: fsTeamArt(r.crest, cacheWidth: 96),
                       ),
               ),
               const SizedBox(width: 8),

@@ -5,7 +5,6 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:nexora/core/storage/local_store.dart';
 import 'package:nexora/core/ui2/nx2_board_art.dart';
-import 'package:flutter/services.dart';
 import 'package:nexora/core/theme/nx_theme.dart';
 import 'package:nexora/games/core/game_contract.dart';
 
@@ -234,11 +233,11 @@ class _SnlGameState extends State<SnlGame> with TickerProviderStateMixin {
       Duration(milliseconds: _l.reducedMotion ? (ms * 0.6).round() : ms));
 
   void _haptic({bool heavy = false}) {
-    if (!_l.soundOn) return;
+    if (!_l.hapticsOn) return;
     if (heavy) {
-      HapticFeedback.mediumImpact();
+      _l.hapticMedium();
     } else {
-      HapticFeedback.selectionClick();
+      _l.hapticSelection();
     }
   }
 

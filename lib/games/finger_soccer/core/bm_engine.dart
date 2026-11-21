@@ -7,6 +7,7 @@ import 'dart:math' as math;
 import 'dart:ui' show Offset;
 
 import 'bm_data.dart';
+import 'fs_custom_team.dart';
 
 // ---------------------------------------------------------------- constants (game.js line 4-6)
 // PR / BR are the radii of the DRAWN disc and ball (rim of the normalised sprites, see kBmDiscArtFill /
@@ -176,7 +177,14 @@ final List<BmTeam> kBmTeams = kBmTeamDefs
     .map((BmTeamDef d) => BmTeam(d.id, d.cat, d.name, 'assets/games/bermuda/${d.art}.webp', d.power, d.accuracy))
     .toList(growable: false);
 
-BmTeam bmTeam(String id) => kBmTeams.firstWhere((BmTeam t) => t.id == id, orElse: () => kBmTeams.first);
+/// The custom team only changes its art. The fixed 6/7 stats are exactly the
+/// free Persepolis team's; a 1000-gem photo cannot buy a gameplay advantage.
+BmTeam bmTeam(String id) {
+  if (fsCustomOwner(id) != null) {
+    return BmTeam(id, 'custom', 'Custom Team', fsCustomArtUrl(id) ?? kFsCustomFallbackArt, 6, 7);
+  }
+  return kBmTeams.firstWhere((BmTeam t) => t.id == id, orElse: () => kBmTeams.first);
+}
 
 /// A team shape: five discs (the keeper first) as [x, d] in the team's own frame. x is the fraction of the playing
 /// width, left to right as the team sees it from its own goal; d is the depth from its own goal line as a fraction of

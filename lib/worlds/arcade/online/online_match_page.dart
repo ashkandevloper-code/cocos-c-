@@ -16,6 +16,7 @@ import '../../../core/theme/nx_theme.dart';
 import '../../../games/game_registry.dart';
 import '../../oracle_core/persona/oracle_persona.dart';
 import '../../oracle_core/persona/oracle_persona_widgets.dart';
+import 'settled_match_result.dart';
 
 import '../../../core/ui2/anix_kit.dart';
 /// Hosts one online match: opens the move link, builds the game in online mode,
@@ -43,7 +44,10 @@ class _OnlineMatchPageState extends ConsumerState<OnlineMatchPage>
   String? _error;
   int _generation = 0;
   bool _finished = false;
+  bool _reporting = false;
+  GameResult? _localResult;
   GameResult? _result;
+  MatchEnd? _serverEnd;
   String? _oracleLine;
   String? _resultNoteFa;
   String? _resultNoteEn;
@@ -99,8 +103,13 @@ class _OnlineMatchPageState extends ConsumerState<OnlineMatchPage>
     final SupabaseMatchLink? l = _link;
     if (l == null || !mounted) return;
     final MatchEnd? end = l.end;
-    if (end != null && !_finished && !end.isForfeit && !_graceStarted) {
-      // Another phone reported the normal end first: our deterministic game ends the same way in a moment.
+    if (end == null) {
+      if (!_finished) setState(() {});
+      return;
+    }
+    if (_serverEnd != null) return;
+    if (!_finished && end.rewardsGranted && !end.isForfeit && !_graceStarted) {
+      // A normal finish arrived first: give the local animation a moment to complete.
       _graceStarted = true;
       Future<void>.delayed(const Duration(seconds: 8), () {
         if (mounted && !_finished) _onLinkChanged();
@@ -108,31 +117,8 @@ class _OnlineMatchPageState extends ConsumerState<OnlineMatchPage>
       setState(() {});
       return;
     }
-    if (end != null && !_finished) {
-      // Ended on the server without our game finishing (forfeit / opponent left).
-      final bool won = end.winners.contains(l.mySeat);
-      final bool draw = end.winners.isEmpty;
-      final int? fs = end.forfeitSeat;
-      final String who =
-          fs != null && fs >= 0 && fs < l.names.length ? l.names[fs] : '';
-      _resultNoteFa = fs == l.mySeat
-          ? 'از بازی خارج شدی'
-          : (fs != null ? '$who از بازی خارج شد' : null);
-      _resultNoteEn = fs == l.mySeat
-          ? 'You left the match'
-          : (fs != null ? '$who left the match' : null);
-      _finish(
-          GameResult(
-            outcome: draw
-                ? GameOutcome.draw
-                : (won ? GameOutcome.win : GameOutcome.loss),
-            summaryFa: _resultNoteFa ?? '',
-            summaryEn: _resultNoteEn ?? '',
-          ),
-          report: false);
-    } else {
-      setState(() {});
-    }
+    _finished = true;
+    _applyServerEnd(end);
   }
 
   List<int> _winnersFor(GameResult r, SupabaseMatchLink l) {
@@ -145,44 +131,67 @@ class _OnlineMatchPageState extends ConsumerState<OnlineMatchPage>
     ];
   }
 
-  void _onGameFinish(GameResult r) => _finish(r, report: true);
-
-  void _finish(GameResult r, {required bool report}) {
+  void _onGameFinish(GameResult r) {
     if (_finished) return;
     _finished = true;
-    if (r.outcome != GameOutcome.draw) NxSfx.instance.play(r.outcome == GameOutcome.win ? 'win' : 'lose');
+    _localResult = r;
     final SupabaseMatchLink? l = _link;
-    if (ref.read(settingsProvider).haptics) HapticFeedback.heavyImpact();
-    if (l != null && report && r.endsMatch) {
-      unawaited(l
-          .report(_winnersFor(r, l), r.scores)
-          .then((_) => ref.read(cloudSyncProvider).refreshWallet()));
-      if (widget.tournamentMatchId != null) unawaited(_reportTournament(r, l));
-    } else {
-      unawaited(ref.read(cloudSyncProvider).refreshWallet());
-    }
-    if (!_recorded) {
-      _recorded = true;
-      _oracleLine = OraclePersona.instance.resultReaction(
-          outcome: switch (r.outcome) { GameOutcome.win => 'win', GameOutcome.loss => 'loss', GameOutcome.draw => 'draw' },
-          myScore: r.score,
-          oppScore: r.opponentScore);
-      final GameInfo? g = gameById(widget.gameId);
-      ref.read(profileProvider).recordOnlineGame(
-            gameId: widget.gameId,
-            gameNameFa: g?.nameFa ?? widget.gameId,
-            gameNameEn: g?.nameEn ?? widget.gameId,
-            outcome: switch (r.outcome) {
-              GameOutcome.win => 'win',
-              GameOutcome.loss => 'loss',
-              GameOutcome.draw => 'draw'
-            },
-            score: r.score,
-          );
-    }
-    Future<void>.delayed(Duration(milliseconds: report ? (r.holdMs ?? 900) : 200), () {
-      if (mounted) setState(() => _result = r);
+    if (l != null && r.endsMatch) unawaited(_submitResult(l, r));
+    Future<void>.delayed(Duration(milliseconds: r.holdMs ?? 900), () {
+      if (mounted && _serverEnd == null) setState(() => _result = r);
     });
+  }
+
+  Future<void> _submitResult(SupabaseMatchLink l, GameResult r) async {
+    if (_reporting || _serverEnd != null) return;
+    _reporting = true;
+    try {
+      final MatchEnd? end = await l.report(_winnersFor(r, l), r.scores);
+      if (mounted && end != null) _applyServerEnd(end);
+    } finally {
+      _reporting = false;
+      if (mounted) setState(() {});
+    }
+  }
+
+  void _applyServerEnd(MatchEnd end) {
+    if (!mounted || _serverEnd != null) return;
+    _serverEnd = end;
+    final SupabaseMatchLink? l = _link;
+    if (end.rewardsGranted && l != null) {
+      final GameResult r = settledMatchResult(end, l.mySeat);
+      _result = r;
+      final int? fs = end.forfeitSeat;
+      final String who = fs != null && fs >= 0 && fs < l.names.length ? l.names[fs] : '';
+      _resultNoteFa = fs == l.mySeat ? 'از بازی خارج شدی' : (fs != null ? '$who از بازی خارج شد' : null);
+      _resultNoteEn = fs == l.mySeat ? 'You left the match' : (fs != null ? '$who left the match' : null);
+      if (!_recorded) {
+        _recorded = true;
+        _oracleLine = OraclePersona.instance.resultReaction(
+            outcome: switch (r.outcome) { GameOutcome.win => 'win', GameOutcome.loss => 'loss', GameOutcome.draw => 'draw' },
+            myScore: r.score,
+            oppScore: r.opponentScore);
+        final GameInfo? g = gameById(widget.gameId);
+        ref.read(profileProvider).recordOnlineGame(
+              gameId: widget.gameId,
+              gameNameFa: g?.nameFa ?? widget.gameId,
+              gameNameEn: g?.nameEn ?? widget.gameId,
+              outcome: r.outcome.name,
+              score: r.score,
+            );
+        if (r.outcome != GameOutcome.draw) NxSfx.instance.play(r.outcome == GameOutcome.win ? 'win' : 'lose');
+        if (ref.read(settingsProvider).haptics) HapticFeedback.heavyImpact();
+        if (widget.tournamentMatchId != null && _localResult != null && !end.isForfeit) {
+          unawaited(_reportTournament(r, l));
+        }
+      }
+    } else {
+      // A dispute, abandonment or administrative closure is NOT a draw and carries NO reward or local record.
+      _result = const GameResult(outcome: GameOutcome.draw);
+      _oracleLine = null;
+    }
+    unawaited(ref.read(cloudSyncProvider).refreshWallet());
+    setState(() {});
   }
 
   /// Tournament: this phone's own report of the game (seat 0 = home). Retries a few times on bad network.
@@ -286,7 +295,8 @@ class _OnlineMatchPageState extends ConsumerState<OnlineMatchPage>
         isFa: s.isFa,
         fancyEffects: s.fancyEffects,
         reducedMotion: s.reducedMotion,
-        soundOn: s.sound && s.haptics,
+        soundOn: s.sound,
+        hapticsOn: s.haptics,
         playerCount: l.seatCount,
         skins: Map<String, String>.from(ref.read(profileProvider).equipped),
         seed: l.seed,
@@ -378,29 +388,21 @@ class _OnlineMatchPageState extends ConsumerState<OnlineMatchPage>
   }
 
   Widget _overlay(BuildContext context, GameResult r) {
-    final (String title, Color color, IconData icon) = switch (r.outcome) {
-      GameOutcome.win => (
-          context.tx('پیروزی!', 'Victory!'),
-          NxColors.gold,
-          Icons.emoji_events_rounded
-        ),
-      GameOutcome.draw => (
-          context.tx('مساوی', 'Draw'),
-          NxColors.turquoise,
-          Icons.handshake_rounded
-        ),
-      GameOutcome.loss => (
-          context.tx('شکست', 'Defeat'),
-          NxColors.danger,
-          Icons.sentiment_dissatisfied_rounded
-        ),
-    };
-    final String summary = context.tx(r.summaryFa, r.summaryEn);
-    final String reward = switch (r.outcome) {
-      GameOutcome.win => '+80 XP · +50',
-      GameOutcome.draw => '+40 XP · +20',
-      GameOutcome.loss => '+20 XP · +8',
-    };
+    final MatchEnd? end = _serverEnd;
+    final bool settled = end?.rewardsGranted ?? false;
+    final (String title, Color color, IconData icon) = end == null
+        ? (context.tx('در انتظار تأیید نتیجه', 'Waiting for match settlement'), NxColors.turquoise, Icons.hourglass_top_rounded)
+        : !settled
+            ? (end.status == 'disputed'
+                ? context.tx('نتیجه مورد اختلاف است', 'Result disputed')
+                : context.tx('مسابقه بدون نتیجه بسته شد', 'Match closed without a result'),
+                NxColors.danger, Icons.report_problem_rounded)
+            : switch (r.outcome) {
+                GameOutcome.win => (context.tx('پیروزی!', 'Victory!'), NxColors.gold, Icons.emoji_events_rounded),
+                GameOutcome.draw => (context.tx('مساوی', 'Draw'), NxColors.turquoise, Icons.handshake_rounded),
+                GameOutcome.loss => (context.tx('شکست', 'Defeat'), NxColors.danger, Icons.sentiment_dissatisfied_rounded),
+              };
+    final String summary = settled ? (_resultNoteFa == null ? '' : context.tx(_resultNoteFa!, _resultNoteEn ?? '')) : '';
     return Container(
       color: Colors.black.withValues(alpha: 0.72),
       alignment: Alignment.center,
@@ -420,17 +422,30 @@ class _OnlineMatchPageState extends ConsumerState<OnlineMatchPage>
         if (_oracleLine != null) OracleResultLine(text: _oracleLine!),
         const SizedBox(height: 10),
         Text(
-            '${context.tx('بازی آنلاین ثبت شد', 'Online match recorded')} · $reward 🪙',
-            style: const TextStyle(color: NxColors.textDim)),
-        if (widget.tournamentMatchId != null)
+          end == null
+              ? context.tx('تا ثبت نتیجه در سرور، رکورد یا پاداشی ثبت نمی‌شود.',
+                  'No record or reward is granted until the server settles the match.')
+              : settled
+                  ? context.tx('نتیجه در سرور ثبت شد؛ کیف پول در حال همگام‌سازی است.',
+                      'Server result recorded; wallet is syncing.')
+                  : context.tx('این مسابقه پاداش ندارد. برای بررسی اختلاف با پشتیبانی تماس بگیر.',
+                      'No reward for this match. Contact support to review the dispute.'),
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: NxColors.textDim),
+        ),
+        if (widget.tournamentMatchId != null && settled)
           Padding(
             padding: const EdgeInsets.only(top: 6),
-            child: Text(
-                context.tx(
-                    'نتیجه برای تورنمنت ارسال شد؛ با تأیید هر دو بازیکن ثبت می‌شود.',
-                    'Result sent to the tournament; it counts once both players agree.'),
+            child: Text(context.tx('وضعیت تورنمنت را پس از بازگشت بررسی کن.',
+                'Check tournament status after returning.'),
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: NxColors.gold, fontSize: 12)),
+          ),
+        if (end == null && !_reporting && _localResult?.endsMatch == true && _link != null)
+          TextButton.icon(
+            onPressed: () => unawaited(_submitResult(_link!, _localResult!)),
+            icon: const Icon(Icons.refresh_rounded),
+            label: Text(context.tx('تلاش دوباره برای ثبت نتیجه', 'Retry settlement')),
           ),
         const SizedBox(height: 22),
         FilledButton.icon(

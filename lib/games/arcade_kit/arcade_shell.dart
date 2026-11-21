@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/profile/profile_service.dart';
@@ -102,7 +101,7 @@ class _ArcadeSoloShellState extends ConsumerState<ArcadeSoloShell> with TickerPr
 
   void _start() {
     if (run.playing || run.over) return;
-    HapticFeedback.lightImpact();
+    widget.launch.hapticLight();
     setState(() {
       run.playing = true;
       run._startedAt = DateTime.now();
@@ -112,7 +111,7 @@ class _ArcadeSoloShellState extends ConsumerState<ArcadeSoloShell> with TickerPr
   void _onOver() {
     final int score = run.score.value;
     _newBest = score > _best && score > 0;
-    HapticFeedback.mediumImpact();
+    widget.launch.hapticMedium();
     setState(() => _overShown = true);
     final ArcadeDef? def = kArcadeDefs[_id];
     final ArcadeMedal medal = def?.medalFor(score) ?? ArcadeMedal.none;

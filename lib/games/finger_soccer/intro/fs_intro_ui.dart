@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'fs_intro_data.dart';
+import 'fs_team_art.dart';
 
 const String kFsStadium = 'assets/games/bermuda/intro/stadium_dusk.webp';
 
@@ -508,7 +509,7 @@ class FsDisc3D extends StatelessWidget {
               width: r * 2,
               height: r * 2,
               decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFFDADDE1)),
-              child: ClipOval(child: Image.asset(asset, fit: BoxFit.cover, gaplessPlayback: true, errorBuilder: (_, __, ___) => const SizedBox())),
+              child: ClipOval(child: fsTeamArt(asset, fit: BoxFit.cover)),
             ),
           ),
         ]),

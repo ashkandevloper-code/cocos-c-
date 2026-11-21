@@ -1,14 +1,21 @@
 // Shop "انتخاب محصول ها" (reference recording 2): back / page-view buttons, category tabs with NEW badges, and a grey
 // panel with a two-column grid of product cards (name, disc art, power / time / aim bars, select or buy-with-gems).
-// Categories map to the engine's real data: national / club / luxury teams, pitches and match balls. "اختصاصی"
-// (custom team from a photo) and "بازیکن ها" (players) have no backend yet and show their reference cards disabled.
+// Categories map to the engine's real data: national / club / luxury teams, a paid personal photo team, pitches
+// and match balls. "بازیکن ها" is still disabled. Paid photos are local/bot only until the games project can verify
+// the main project's entitlement; the online card remains visibly locked.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:nexora/core/online/online_service.dart';
 import 'package:nexora/core/economy/gem_shop.dart';
 import 'package:nexora/core/profile/profile_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/bm_data.dart';
 import '../core/bm_engine.dart';
+import '../core/fs_custom_team.dart';
+import 'fs_custom_photo.dart';
 import 'fs_intro_data.dart';
 import 'fs_intro_ui.dart';
 
@@ -71,6 +78,7 @@ class FsShop extends StatefulWidget {
     required this.onBack,
     this.tab = 0,
     this.topLane = 0,
+    this.allowCustom = true,
   });
   final bool fa;
 
@@ -80,6 +88,7 @@ class FsShop extends StatefulWidget {
   final VoidCallback onBack;
   final int tab;
   final double topLane;
+  final bool allowCustom;
   @override
   State<FsShop> createState() => _FsShopState();
 }
@@ -100,11 +109,13 @@ class _FsShopState extends State<FsShop> {
   bool _paged = false;
   int _field = 0, _ball = kBmDefaultBall;
   late String _team = widget.team;
+  bool _working = false;
 
   @override
   void initState() {
     super.initState();
     GemShop.instance.addListener(_changed);
+    if (GemShop.instance.online) unawaited(GemShop.instance.refresh());
     SharedPreferences.getInstance().then((SharedPreferences p) {
       if (!mounted) return;
       setState(() {
@@ -324,25 +335,134 @@ class _FsShopState extends State<FsShop> {
         ),
       );
 
-  Widget _customCard() => _cardShell(
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: <Widget>[
+  void _customMessage(String message) {
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
+      content: Text(message, textDirection: TextDirection.rtl)));
+  }
+
+  Future<void> _buyCustom() async {
+    final GemShop shop = GemShop.instance;
+    if (_working || shop.busy) return;
+    if (!shop.online || (OnlineService.current?.isGuest ?? true)) {
+      _customMessage('برای خرید تیم اختصاصی وارد حساب کاربری شو.');
+      return;
+    }
+    final int balance = ProfileService.current?.gems ?? 0;
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext c) => AlertDialog(
+        backgroundColor: kFsNavy,
+        title: Text('تیم اختصاصی', style: fsText(18, weight: FontWeight.w900)),
+        content: Text('ساخت تیم عکس‌دار با ${fsFa(kFsCustomPrice)} الماس؟\nموجودی: ${fsFa(balance)}',
+          style: fsText(13), textDirection: TextDirection.rtl),
+        actions: <Widget>[
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('انصراف')),
+          TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('خرید')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _working = true);
+    try {
+      // The UI's displayed number is not sent to the server. The catalog RPC
+      // charges exactly 1000 once (or reports already owned) under a row lock.
+      final GemBuyResult result = await shop.buyTeam('custom');
+      if (!mounted) return;
+      _customMessage(result.ok
+          ? 'خرید ثبت شد؛ حالا یک عکس برای تیمت انتخاب کن.'
+          : gemErrorText(result.error, widget.fa));
+    } finally {
+      if (mounted) setState(() => _working = false);
+    }
+  }
+
+  Future<void> _pickCustomPhoto() async {
+    final GemShop shop = GemShop.instance;
+    if (_working || shop.busy || !shop.customEntitled) return;
+    XFile? file;
+    try {
+      file = await ImagePicker().pickImage(
+        source: ImageSource.gallery, maxWidth: 720, maxHeight: 720, imageQuality: 85);
+    } catch (_) {
+      if (mounted) _customMessage('دسترسی به گالری ممکن نشد.');
+      return;
+    }
+    if (file == null || !mounted) return;
+    setState(() => _working = true);
+    try {
+      final photo = await fsPrepareCustomPhoto(await file.readAsBytes());
+      await shop.uploadCustomPhoto(photo);
+      if (!mounted) return;
+      final String? teamId = shop.customTeamId;
+      if (teamId != null) {
+        setState(() => _team = teamId);
+        widget.onTeam(teamId);
+      }
+      _customMessage('عکس تیم ذخیره شد. در بازی محلی یا با ربات قابل انتخاب است.');
+    } catch (_) {
+      if (mounted) _customMessage('عکس ذخیره نشد؛ اتصال و حجم عکس را بررسی کن و دوباره تلاش کن.');
+    } finally {
+      if (mounted) setState(() => _working = false);
+    }
+  }
+
+  void _selectCustom() {
+    final String? id = GemShop.instance.customTeamId;
+    if (id == null || !widget.allowCustom) return;
+    setState(() => _team = id);
+    widget.onTeam(id);
+  }
+
+  Widget _customCard() {
+    final GemShop shop = GemShop.instance;
+    final String? id = shop.customTeamId;
+    final bool ready = id != null;
+    final bool chosen = ready && _team == id;
+    final bool enabled = widget.allowCustom && !_working && !shop.busy;
+    final String caption = !widget.allowCustom
+        ? 'انتخاب تیم عکس‌دار فقط در بازی محلی و با ربات فعال است'
+        : !shop.customEntitled
+            ? 'تیم عکس‌دار خودت را با ${fsFa(kFsCustomPrice)} الماس بساز'
+            : !ready ? 'خرید ثبت شد؛ عکس دلخواهت را اضافه کن' : 'عکس تو · با قدرت تیم پیش‌فرض';
+    return _cardShell(
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: <Widget>[
+          if (id != null && widget.allowCustom)
+            FsDisc3D(asset: bmTeam(id).asset, r: 27, depth: 4)
+          else
             Container(
-              width: 62,
-              height: 62,
-              decoration: BoxDecoration(
-                  shape: BoxShape.circle, color: const Color(0xFF555555), border: Border.all(color: const Color(0xFFBDBDBD), width: 3)),
+              width: 62, height: 62,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0xFF555555),
+                border: Border.all(color: const Color(0xFFBDBDBD), width: 3)),
               child: const Icon(Icons.add_a_photo_rounded, color: Colors.white, size: 28),
             ),
-            const SizedBox(height: 8),
-            Text('با عکس دلخواهت تیم اختصاصی خودت رو بساز',
-                textAlign: TextAlign.center, style: fsText(11.5, weight: FontWeight.w700, height: 1.35)),
-            const SizedBox(height: 8),
-            FsPress(enabled: false, onTap: () {}, child: fsLimeButton('ساخت تیم', 120, 27, size: 12)),
-          ]),
-        ),
-      );
+          const SizedBox(height: 7),
+          Text(caption, textAlign: TextAlign.center, maxLines: 2,
+            style: fsText(11, weight: FontWeight.w700, height: 1.25)),
+          const SizedBox(height: 7),
+          FsPress(
+            enabled: enabled && !chosen,
+            onTap: !enabled || chosen ? null : !shop.customEntitled ? _buyCustom : !ready ? _pickCustomPhoto : _selectCustom,
+            child: !widget.allowCustom
+                ? fsGreyButton('فقط بازی محلی', 120, 27, size: 11)
+                : !shop.customEntitled
+                    ? fsBuyButton('خرید', kFsCustomPrice, 120, 27, size: 12)
+                    : !ready
+                        ? fsLimeButton('انتخاب عکس', 120, 27, size: 12)
+                        : chosen
+                            ? fsGreyButton('انتخاب شده', 120, 27, size: 12)
+                            : fsLimeButton('انتخاب', 120, 27, size: 12),
+          ),
+          if (ready && widget.allowCustom) ...<Widget>[
+            const SizedBox(height: 5),
+            FsPress(enabled: enabled, onTap: enabled ? _pickCustomPhoto : null,
+              child: fsGreyButton('تغییر عکس', 100, 23, size: 11)),
+          ],
+        ]),
+      ),
+    );
+  }
 
   Widget _emptyCard(String s) => _cardShell(child: Center(child: Text(s, style: fsText(12, color: const Color(0xFFBBBBBB)))));
 

@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'package:flutter/services.dart';
 
 import 'net_link.dart';
 
@@ -43,6 +44,7 @@ class GameLaunch {
     required this.reducedMotion,
     required this.soundOn,
     required this.onFinish,
+    this.hapticsOn = false,
     this.playerCount = 2,
     this.skins = const {},
     this.seed,
@@ -65,7 +67,26 @@ class GameLaunch {
   /// false on Low quality or Reduced Motion: drop particles/trails/shake.
   final bool fancyEffects;
   final bool reducedMotion;
+
+  /// In-game audio and haptics are independent user preferences. Do not mute audio when vibration is off.
   final bool soundOn;
+  final bool hapticsOn;
+
+  void hapticSelection() {
+    if (hapticsOn) HapticFeedback.selectionClick();
+  }
+
+  void hapticLight() {
+    if (hapticsOn) HapticFeedback.lightImpact();
+  }
+
+  void hapticMedium() {
+    if (hapticsOn) HapticFeedback.mediumImpact();
+  }
+
+  void hapticHeavy() {
+    if (hapticsOn) HapticFeedback.heavyImpact();
+  }
 
   /// Total seats (2..6 depending on the game). Seat 0 is always the local player.
   final int playerCount;

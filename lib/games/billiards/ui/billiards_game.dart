@@ -3,7 +3,6 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:flutter/services.dart';
 
 import '../../../core/theme/nx_theme.dart';
 import '../../core/game_contract.dart';
@@ -279,19 +278,19 @@ class _BilliardsGameState extends State<BilliardsGame>
 
   // ---------------------------------------------------------------- helpers
   void _haptic(int level) {
-    if (!_l.soundOn) return;
+    if (!_l.hapticsOn) return;
     final int now = DateTime.now().millisecondsSinceEpoch;
     if (level == 0 && now - _lastHapticMs < 90) return;
     _lastHapticMs = now;
     switch (level) {
       case 0:
-        HapticFeedback.selectionClick();
+        _l.hapticSelection();
         break;
       case 1:
-        HapticFeedback.lightImpact();
+        _l.hapticLight();
         break;
       default:
-        HapticFeedback.mediumImpact();
+        _l.hapticMedium();
         break;
     }
   }

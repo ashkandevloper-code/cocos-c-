@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 
 import 'fs_intro_data.dart';
 import 'fs_intro_ui.dart';
+import 'fs_team_art.dart';
 
 class FsFormationSelect extends StatefulWidget {
   const FsFormationSelect({
@@ -175,7 +176,7 @@ class _MiniDisc extends StatelessWidget {
           color: Color(0xFFE23B2E),
           boxShadow: <BoxShadow>[BoxShadow(color: Color(0x99000000), blurRadius: 1.5, offset: Offset(0, 1.2))],
         ),
-        child: ClipOval(child: Image.asset(asset, fit: BoxFit.cover, cacheWidth: 48, errorBuilder: (_, __, ___) => const SizedBox())),
+        child: ClipOval(child: fsTeamArt(asset, fit: BoxFit.cover, cacheWidth: 48)),
       );
 }
 

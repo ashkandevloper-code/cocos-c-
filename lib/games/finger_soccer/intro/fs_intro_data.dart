@@ -43,7 +43,9 @@ const List<String> _faDigits = <String>['۰', '۱', '۲', '۳', '۴', '۵', '۶'
 /// Western digits -> Persian digits.
 String fsFa(Object v) => '$v'.replaceAllMapped(RegExp('[0-9]'), (Match m) => _faDigits[int.parse(m[0]!)]);
 
-String fsTeamName(BmTeam t, bool fa) => fa ? (kFsTeamFa[t.name] ?? t.name) : t.name;
+String fsTeamName(BmTeam t, bool fa) => t.cat == 'custom'
+    ? (fa ? 'تیم اختصاصی' : 'Custom Team')
+    : (fa ? (kFsTeamFa[t.name] ?? t.name) : t.name);
 
 /// Persian names of the engine's teams (by their English name in kBmTeamDefs).
 const Map<String, String> kFsTeamFa = <String, String>{

@@ -7,10 +7,13 @@ import '../../games/core/net_link.dart';
 
 /// Final state of a match as stored on the server.
 class MatchEnd {
-  const MatchEnd({required this.winners, required this.reason, this.scores});
+  const MatchEnd({required this.status, required this.winners, required this.reason, this.scores});
+  /// Only a finished, reward-eligible match may update local records or display a reward.
+  final String status;
   final List<int> winners;
   final String reason;
   final List<int>? scores;
+  bool get rewardsGranted => status == 'finished' && !reason.startsWith('admin_');
   bool get isForfeit => reason.startsWith('forfeit');
   int? get forfeitSeat => isForfeit ? int.tryParse(reason.split(':').last) : null;
 }
@@ -180,6 +183,7 @@ class SupabaseMatchLink extends ChangeNotifier implements NetLink {
   }
 
   MatchEnd _endFrom(Map<String, dynamic> m) => MatchEnd(
+        status: '${m['status']}',
         winners: ((m['winner_seats'] as List<dynamic>?) ?? const <dynamic>[]).map((dynamic e) => (e as num).toInt()).toList(),
         reason: '${m['reason'] ?? 'finished'}',
         scores: (m['scores'] as List<dynamic>?)?.map((dynamic e) => (e as num).toInt()).toList(),

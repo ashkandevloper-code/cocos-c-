@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../arcade_kit/arcade_controls.dart';
 import '../../arcade_kit/arcade_fx.dart';
@@ -113,7 +112,7 @@ class _SpyGameViewState extends ArcadeLoopState<SpyGameView> {
     if (a == 'vote') ok = g.vote(me, v);
     if (a == 'guess') ok = g.guess(v);
     if (!ok) return;
-    HapticFeedback.selectionClick();
+    l.hapticSelection();
     if (tn != null) {
       unawaited(tn!.send(<String, dynamic>{'a': a, 'v': v}));
       tn!.turn = _turnSeat;
@@ -127,7 +126,7 @@ class _SpyGameViewState extends ArcadeLoopState<SpyGameView> {
     if (g.phase != _lastPhase) {
       _lastPhase = g.phase;
       _phaseT = 0;
-      if (g.phase == SpyPhase.vote) HapticFeedback.mediumImpact();
+      if (g.phase == SpyPhase.vote) l.hapticMedium();
       if (g.phase == SpyPhase.over) _finish();
       setState(() {});
     }
@@ -173,7 +172,7 @@ class _SpyGameViewState extends ArcadeLoopState<SpyGameView> {
     final bool won = order.isNotEmpty && g.isSpy(me) == g.spiesWin;
     if (won) {
       fx.confetti(MediaQuery.sizeOf(context).center(Offset.zero), count: 60);
-      HapticFeedback.heavyImpact();
+      l.hapticHeavy();
     }
     Timer(const Duration(milliseconds: 3200), () {
       if (!mounted) return;

@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../arcade_kit/arcade_controls.dart';
 import '../../arcade_kit/arcade_fx.dart';
@@ -150,10 +149,10 @@ class _KartGameState extends ArcadeLoopState<KartGame> {
       final int c = race.countdown.ceil();
       if (race.countdown <= 0) {
         _setBanner('GO!', 0.8);
-        HapticFeedback.mediumImpact();
+        l.hapticMedium();
       } else if (before.ceil() != c || _banner.isEmpty) {
         _setBanner('$c', 2);
-        HapticFeedback.selectionClick();
+        l.hapticSelection();
       }
     } else if (_bannerTime > 0) {
       _bannerTime -= dt;
@@ -246,7 +245,7 @@ class _KartGameState extends ArcadeLoopState<KartGame> {
       switch (e.kind) {
         case 'pickup':
           fx.burst(at, skin.accent2, count: 16, speed: 220, kind: ParticleKind.orb, size: 5);
-          if (mine) HapticFeedback.lightImpact();
+          if (mine) l.hapticLight();
         case 'boost':
         case 'pad':
           fx.burst(at, e.other >= 2 ? const Color(0xFFB98CFF) : const Color(0xFFFF9D2E), count: 14, speed: 200);
@@ -257,13 +256,13 @@ class _KartGameState extends ArcadeLoopState<KartGame> {
           fx.burst(at, const Color(0xFF555555), count: 10, speed: 80, kind: ParticleKind.smoke, life: 1.2, size: 12);
           if (mine) {
             fx.shake(10);
-            HapticFeedback.heavyImpact();
+            l.hapticHeavy();
           }
         case 'bump':
         case 'wall':
           if (mine || e.other == me) {
             fx.shake(e.kind == 'wall' ? 4 : 3);
-            HapticFeedback.lightImpact();
+            l.hapticLight();
           }
         case 'shield_break':
           fx.ring(at, const Color(0xFF7FE9FF), size: 24);
@@ -275,7 +274,7 @@ class _KartGameState extends ArcadeLoopState<KartGame> {
           if (mine) {
             _setBanner('${l.tx('پایان!', 'FINISH!')} ${ordinalEn(e.other)}', 3);
             fx.confetti(at, count: 60);
-            HapticFeedback.heavyImpact();
+            l.hapticHeavy();
           }
       }
     }
@@ -676,11 +675,13 @@ class _KartGameState extends ArcadeLoopState<KartGame> {
         at(
             lay.steerLeft,
             ArcadePadButton(
+                hapticsOn: l.hapticsOn,
                 icon: Icons.arrow_back_rounded, color: const Color(0xFF2F8BFF), size: lay.steerLeft.width,
                 onDown: () => _left = 1, onUp: () => _left = 0)),
         at(
             lay.steerRight,
             ArcadePadButton(
+                hapticsOn: l.hapticsOn,
                 icon: Icons.arrow_forward_rounded, color: const Color(0xFF2F8BFF), size: lay.steerRight.width,
                 onDown: () => _right = 1, onUp: () => _right = 0)),
         at(
@@ -690,6 +691,7 @@ class _KartGameState extends ArcadeLoopState<KartGame> {
             builder: (_, __, ___) {
               final KartItem it = race.karts[me].item;
               return ArcadePadButton(
+                hapticsOn: l.hapticsOn,
                 icon: _itemIcon(it),
                 color: it == KartItem.none ? const Color(0xFF555A66) : const Color(0xFFFF4F9A),
                 size: lay.itemButton.width,
@@ -702,6 +704,7 @@ class _KartGameState extends ArcadeLoopState<KartGame> {
         at(
             lay.driftButton,
             ArcadePadButton(
+                hapticsOn: l.hapticsOn,
                 icon: Icons.u_turn_right_rounded, label: l.tx('دریفت', 'DRIFT'), color: skin.accent, size: lay.driftButton.width,
                 onDown: () => _drift = true, onUp: () => _drift = false)),
       ]);

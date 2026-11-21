@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import 'package:nexora/core/theme/nx_theme.dart';
 import 'package:nexora/core/economy/gem_shop.dart';
 import 'package:nexora/core/profile/profile_service.dart';
+import 'package:nexora/core/online/online_service.dart';
 import 'package:nexora/core/ui2/anix_kit.dart';
 import 'package:nexora/core/widgets/user_avatar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -17,12 +18,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:nexora/games/core/game_contract.dart';
 import '../core/bm_data.dart';
 import '../core/bm_engine.dart';
+import '../core/fs_custom_team.dart';
+import '../core/fs_custom_team_photo.dart';
 import 'bm_audio.dart';
 import 'bm_ball.dart';
 import 'bm_painter.dart';
 import '../intro/fs_game_bar.dart';
 import '../intro/fs_intro_data.dart';
 import '../intro/fs_intro_ui.dart' show FsBarHandle, kFsBarHandleHeight, kFsBarHandleWidth;
+import '../intro/fs_team_art.dart';
 import '../intro/fs_online_pick.dart';
 import '../intro/fs_score_table.dart';
 import '../intro/fs_team_select.dart' show FsSidePlayer;
@@ -73,7 +77,7 @@ class _Setup {
     if (t == null) return null;
     int i(String k) => (d[k] as num?)?.toInt() ?? 0;
     return _Setup(
-        t,
+        kBmTeams.any((BmTeam x) => x.id == t) ? t : kDefaultTeam,
         i('form').clamp(0, kBmForms.length - 1).toInt(),
         bmFieldIndex(i('field')),
         bmBallIndex((d['ball'] as num?)?.toInt()));
@@ -191,9 +195,14 @@ class _BermudaViewState extends State<BermudaView>
     try {
       final SharedPreferences p = await SharedPreferences.getInstance();
       final String t = p.getString('bm.team') ?? kDefaultTeam;
+      if (!online && fsCustomOwner(t) != null && GemShop.instance.customTeamId == null) {
+        await GemShop.instance.refreshCustom();
+      }
       my = _Setup(
-          // Only an owned (or free) team can be fielded; locked teams fall back to the default free team.
-          GemShop.instance.usableTeam(kBmTeams.any((BmTeam x) => x.id == t) ? t : kDefaultTeam),
+          // Only a server-confirmed personal photo may be fielded in a local match.
+          GemShop.instance.usableTeam(
+              kBmTeams.any((BmTeam x) => x.id == t) || (!online && fsCustomOwner(t) != null)
+                  ? t : kDefaultTeam),
           (p.getInt('bm.form') ?? 0).clamp(0, kBmForms.length - 1).toInt(),
           bmFieldIndex(p.getInt('bm.field')),
           bmBallIndex(p.getInt(kBmBallPref)));
@@ -306,14 +315,14 @@ class _BermudaViewState extends State<BermudaView>
 
   @override
   void vib(List<int> pattern) {
-    if (!launch.soundOn) return;
+    if (!launch.hapticsOn) return;
     final int total = pattern.fold(0, (int a, int b) => a + b);
     if (total >= 100) {
-      HapticFeedback.heavyImpact();
+      launch.hapticHeavy();
     } else if (total >= 30) {
-      HapticFeedback.mediumImpact();
+      launch.hapticMedium();
     } else {
-      HapticFeedback.lightImpact();
+      launch.hapticLight();
     }
   }
 
@@ -385,8 +394,9 @@ class _BermudaViewState extends State<BermudaView>
         .where((BmTeam t) => t.id != my.team && (t.cat != 'lux' || r.nextInt(4) == 0))
         .toList();
     final FsMatchPick? pk = widget.pick;
-    final String opp = pk != null ? pk.teams[1] : clubs[r.nextInt(clubs.length)].id;
-    final String mine = pk != null ? pk.teams[0] : my.team;
+    String localTeam(String id) => fsCustomOwner(id) != null ? GemShop.instance.usableTeam(id) : id;
+    final String opp = pk != null ? localTeam(pk.teams[1]) : clubs[r.nextInt(clubs.length)].id;
+    final String mine = pk != null ? localTeam(pk.teams[0]) : my.team;
     final bool bot = launch.vsBot;
     final int lvl = switch (launch.difficulty) {
       BotDifficulty.easy => 0,
@@ -508,16 +518,39 @@ class _BermudaViewState extends State<BermudaView>
 
   Future<ui.Image?> _img(String path, {int? w}) async {
     try {
-      final ByteData data = await DefaultAssetBundle.of(context).load(path);
+      final ByteData data = path.startsWith('https://')
+          ? await NetworkAssetBundle(Uri.parse(path)).load(path)
+          : await DefaultAssetBundle.of(context).load(path);
       final ui.Codec codec = await ui
-          .instantiateImageCodec(data.buffer.asUint8List(), targetWidth: w);
+          .instantiateImageCodec(data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes), targetWidth: w);
       final ui.FrameInfo f = await codec.getNextFrame();
       codec.dispose();
       return f.image;
     } catch (err) {
       debugPrint('bermuda image $path: $err');
+      // A failed public photo never leaves invisible pieces on the pitch.
+      if (path.startsWith('https://')) return _img(kFsCustomFallbackArt, w: w);
       return null;
     }
+  }
+
+  Future<ui.Image?> _teamImage(String teamId) async {
+    if (fsCustomOwner(teamId) != null && teamId == GemShop.instance.customTeamId) {
+      final bytes = FsCustomTeamPhoto.forTeam(teamId, OnlineService.current?.uid);
+      if (bytes != null) {
+        try {
+          final ui.Codec codec = await ui.instantiateImageCodec(bytes, targetWidth: 192);
+          try {
+            return (await codec.getNextFrame()).image;
+          } finally {
+            codec.dispose();
+          }
+        } catch (_) {
+          // Keep the public URL / bundled art fallback available.
+        }
+      }
+    }
+    return _img(bmTeam(teamId).asset, w: 192);
   }
 
   Future<void> _loadMatchImages(BmConfig c) async {
@@ -527,8 +560,8 @@ class _BermudaViewState extends State<BermudaView>
       f.builtInGoals ? Future<ui.Image?>.value(null) : _img('${_a}goals/${f.gs}.webp'),
       // v6: the classic ball is drawn by the 3D roller from its flat art (no sprite sheet)
       c.ball == kBmClassicBallIndex ? _img(kBmClassicBall) : Future<ui.Image?>.value(null),
-      _img(bmTeam(c.teams[e.ct(0)]).asset, w: 192),
-      _img(bmTeam(c.teams[e.ct(1)]).asset, w: 192),
+      _teamImage(c.teams[e.ct(0)]),
+      _teamImage(c.teams[e.ct(1)]),
     ]);
     if (!mounted || _disposed) {
       for (final ui.Image? i in r) {
@@ -688,7 +721,9 @@ class _BermudaViewState extends State<BermudaView>
       // v5: a side's team pick (before its formation). Never a play move, so it does not mark a legacy room match.
       final int seat = ((d['for'] as num?)?.toInt() ?? m.seat);
       final dynamic t = d['team'];
-      if (t is String && seat >= 0 && !_teamPicks.containsKey(seat)) _teamPicks[seat] = t;
+      if (t is String && kBmTeams.any((BmTeam x) => x.id == t) && seat >= 0 && !_teamPicks.containsKey(seat)) {
+        _teamPicks[seat] = t;
+      }
       if (mounted) setState(() {});
       return;
     }
@@ -1374,8 +1409,8 @@ class _BermudaViewState extends State<BermudaView>
                   : null,
             ),
             child: ClipOval(
-                child: Image.asset(bmTeam(e.sel[e.ct(t)]).asset,
-                    cacheWidth: 96, fit: BoxFit.contain)),
+                child: fsTeamArt(bmTeam(e.sel[e.ct(t)]).asset,
+                    cacheWidth: 96)),
           );
           final Widget identity = Expanded(
             child: Column(

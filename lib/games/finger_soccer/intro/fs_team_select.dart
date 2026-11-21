@@ -7,9 +7,11 @@ import 'package:flutter/material.dart';
 import 'package:nexora/core/economy/gem_shop.dart';
 
 import '../core/bm_engine.dart';
+import '../core/fs_custom_team.dart';
 import 'fs_intro_data.dart';
 import 'fs_intro_ui.dart';
 import 'fs_shop.dart';
+import 'fs_team_art.dart';
 
 /// Who plays a side (captain avatar under the toggle).
 class FsSidePlayer {
@@ -42,6 +44,7 @@ class FsTeamSelect extends StatefulWidget {
     this.side = 0,
     this.onSide,
     this.fixedSide,
+    this.allowCustom = true,
   });
   final bool fa;
 
@@ -66,15 +69,27 @@ class FsTeamSelect extends StatefulWidget {
   /// toggle shows a hint instead of switching, so the arrows / buy button can only change this side.
   final int? fixedSide;
 
+  /// Online games cannot yet verify the main project's paid entitlement on
+  /// the separate games server; only local/bot matches may field this photo.
+  final bool allowCustom;
+
   @override
   State<FsTeamSelect> createState() => _FsTeamSelectState();
 }
 
 class _FsTeamSelectState extends State<FsTeamSelect> {
   late int _side = widget.side;
-  late final List<int> _browse = <int>[
-    for (final String t in widget.teams) kBmTeams.indexWhere((BmTeam x) => x.id == t).clamp(0, kBmTeams.length - 1),
-  ];
+  List<BmTeam> get _roster => <BmTeam>[
+        ...kBmTeams,
+        if (widget.allowCustom && GemShop.instance.customTeamId != null)
+          bmTeam(GemShop.instance.customTeamId!),
+      ];
+  int _indexOf(String id) {
+    final int index = _roster.indexWhere((BmTeam t) => t.id == id);
+    return index < 0 ? 0 : index;
+  }
+  late final List<int> _browse = <int>[for (final String t in widget.teams) _indexOf(t)];
+  late final List<String> _lastPicked = List<String>.of(widget.teams);
   late int _left = widget.countdown;
   Timer? _timer;
   bool _done = false;
@@ -97,6 +112,19 @@ class _FsTeamSelectState extends State<FsTeamSelect> {
     }
   }
 
+  @override
+  void didUpdateWidget(FsTeamSelect oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // The shop changes the same mutable teams list, so oldWidget.teams is not
+    // a reliable snapshot. Keep our own values to sync the visible disc.
+    for (int i = 0; i < widget.teams.length && i < _browse.length; i++) {
+      if (widget.teams[i] != _lastPicked[i]) {
+        _browse[i] = _indexOf(widget.teams[i]);
+        _lastPicked[i] = widget.teams[i];
+      }
+    }
+  }
+
   void _changed() {
     if (mounted) setState(() {});
   }
@@ -113,7 +141,13 @@ class _FsTeamSelectState extends State<FsTeamSelect> {
     if (_done) return;
     _done = true;
     _timer?.cancel();
-    widget.onReady(List<String>.of(widget.teams));
+    final List<String> safe = List<String>.of(widget.teams);
+    for (int i = 0; i < safe.length; i++) {
+      if (fsCustomOwner(safe[i]) != null) {
+        safe[i] = widget.allowCustom ? GemShop.instance.usableTeam(safe[i]) : kDefaultTeam;
+      }
+    }
+    widget.onReady(safe);
   }
 
   void _say(String s) {
@@ -124,14 +158,18 @@ class _FsTeamSelectState extends State<FsTeamSelect> {
     });
   }
 
-  BmTeam get _t => kBmTeams[_browse[_side]];
+  BmTeam get _t => _roster[_browse[_side].clamp(0, _roster.length - 1)];
 
   /// Browsing with the arrows also picks the team shown when it can be fielded (owned, or the opponent side), so the
   /// team on screen is the team that plays; a locked team still needs the buy button (or a tap on the disc).
   void _step(int d) => setState(() {
-        _browse[_side] = (_browse[_side] + d) % kBmTeams.length;
-        final BmTeam t = kBmTeams[_browse[_side]];
-        if (!_needsOwn || GemShop.instance.ownsTeam(t.id)) widget.teams[_side] = t.id;
+        final List<BmTeam> roster = _roster;
+        _browse[_side] = (_browse[_side] + d) % roster.length;
+        final BmTeam t = roster[_browse[_side]];
+        if (!_needsOwn || GemShop.instance.ownsTeam(t.id)) {
+          widget.teams[_side] = t.id;
+          _lastPicked[_side] = t.id;
+        }
       });
 
   bool get _needsOwn => _side == 0 && widget.ownedOnlySide0;
@@ -142,11 +180,14 @@ class _FsTeamSelectState extends State<FsTeamSelect> {
       final bool ok = await fsBuyTeam(context, t, widget.fa);
       if (!ok || !mounted) return;
     }
-    setState(() => widget.teams[_side] = t.id);
+    setState(() {
+      widget.teams[_side] = t.id;
+      _lastPicked[_side] = t.id;
+    });
   }
 
   void _showTable() {
-    final List<BmTeam> rows = List<BmTeam>.of(kBmTeams)
+    final List<BmTeam> rows = List<BmTeam>.of(_roster)
       ..sort((BmTeam a, BmTeam b) => (b.power + b.accuracy).compareTo(a.power + a.accuracy));
     showDialog<void>(
       context: context,
@@ -181,7 +222,7 @@ class _FsTeamSelectState extends State<FsTeamSelect> {
                     decoration: BoxDecoration(color: kFsNavyTile, borderRadius: BorderRadius.circular(8)),
                     child: Row(children: <Widget>[
                       SizedBox(width: 28, child: Text(fsFa(i + 1), style: fsText(12))),
-                      SizedBox(width: 26, height: 26, child: Image.asset(t.asset, cacheWidth: 64, errorBuilder: (_, __, ___) => const SizedBox())),
+                      SizedBox(width: 26, height: 26, child: fsTeamArt(t.asset, cacheWidth: 64)),
                       const SizedBox(width: 6),
                       Expanded(child: Text(fsTeamName(t, widget.fa), overflow: TextOverflow.ellipsis, style: fsText(12))),
                       for (final int v in <int>[t.power, fsTimeStat(t), t.accuracy])

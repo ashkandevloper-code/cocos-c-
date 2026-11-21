@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../arcade_kit/arcade_controls.dart';
 import '../../arcade_kit/arcade_fx.dart';
@@ -103,7 +102,7 @@ class _Pool8GameState extends ArcadeLoopState<Pool8Game> {
     if (tn?.replaying ?? false) return;
     if (strength > 900 && !cushion) {
       fx.burst(_px(x, y), Colors.white, count: 5, speed: 90, size: 2, life: 0.25);
-      if (strength > 2400) HapticFeedback.selectionClick();
+      if (strength > 2400) l.hapticSelection();
     }
   }
 
@@ -113,7 +112,7 @@ class _Pool8GameState extends ArcadeLoopState<Pool8Game> {
     final Offset at = _px(p[0], p[1]);
     fx.burst(at, kPoolBallColors[id], count: 16, speed: 140, size: 3.5, kind: ParticleKind.orb);
     fx.ring(at, skin.accent2, size: 18);
-    HapticFeedback.lightImpact();
+    l.hapticLight();
   }
 
   Offset _px(double x, double y) => _o + Offset(x, y) * _s;
@@ -189,7 +188,7 @@ class _Pool8GameState extends ArcadeLoopState<Pool8Game> {
     if (tn != null) unawaited(tn!.send(<String, dynamic>{'a': 'shot', ...s.toJson()}));
     game.shoot(s);
     fx.shake(power * 4);
-    HapticFeedback.mediumImpact();
+    l.hapticMedium();
   }
 
   void _panStart(DragStartDetails d) {

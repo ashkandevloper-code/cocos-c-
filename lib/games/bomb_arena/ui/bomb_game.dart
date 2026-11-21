@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../arcade_kit/arcade_controls.dart';
 import '../../arcade_kit/arcade_fx.dart';
@@ -220,12 +219,12 @@ class _BombGameState extends ArcadeLoopState<BombGame> {
           fx.burst(at, const Color(0xFFFFB13D), count: 26, speed: t * 6, size: t * 0.12, life: 0.5, kind: ParticleKind.orb);
           fx.burst(at, const Color(0xFF555566), count: 8, speed: t * 1.6, size: t * 0.3, life: 1.0, kind: ParticleKind.smoke);
           fx.shake(7);
-          HapticFeedback.mediumImpact();
+          l.hapticMedium();
         case 'crate':
           fx.burst(at, const Color(0xFFB07A3E), count: 12, speed: t * 4, size: t * 0.14, life: 0.6, kind: ParticleKind.shard, gravity: t * 6);
         case 'pickup':
           fx.ring(at, skin.accent2, size: t * 0.4, life: 0.4);
-          if (e.seat == me) HapticFeedback.lightImpact();
+          if (e.seat == me) l.hapticLight();
         case 'stun':
           fx.burst(at, const Color(0xFFFFE14D), count: 14, speed: t * 3, size: t * 0.1);
         case 'drop':
@@ -238,7 +237,7 @@ class _BombGameState extends ArcadeLoopState<BombGame> {
           if (e.seat == me) {
             _say(l.tx('حذف شدی!', 'KNOCKED OUT!'), 1.4);
             fx.flashScreen(const Color(0xFFFF2D55));
-            HapticFeedback.heavyImpact();
+            l.hapticHeavy();
           }
         case 'roundEnd':
           _say(
@@ -530,6 +529,7 @@ class _BombGameState extends ArcadeLoopState<BombGame> {
             ValueListenableBuilder<int>(
               valueListenable: frame,
               builder: (_, __, ___) => ArcadePadButton(
+                hapticsOn: l.hapticsOn,
                 icon: Icons.warning_amber_rounded,
                 color: const Color(0xFFE0B21A),
                 size: 54,
@@ -542,7 +542,7 @@ class _BombGameState extends ArcadeLoopState<BombGame> {
               ),
             ),
             const SizedBox(width: 12),
-            ArcadePadButton(icon: Icons.brightness_7_rounded, label: l.tx('بمب', 'BOMB'), color: skin.accent, size: bombSize,
+            ArcadePadButton(hapticsOn: l.hapticsOn, icon: Icons.brightness_7_rounded, label: l.tx('بمب', 'BOMB'), color: skin.accent, size: bombSize,
                 onDown: () => _bombTap = true),
           ]),
         ),

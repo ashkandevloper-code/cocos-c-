@@ -47,7 +47,14 @@ class ArcadeDef {
               : ArcadeMedal.none;
 }
 
-/// Multiplayer games (bot opponents offline, online rooms / invites / tournaments).
+/// Planned arcade catalog (20 designs), NOT 20 executable entries. Only the 7
+/// games below have builders in arcade_registry.dart. Keep the planned IDs for
+/// design data, but never count them as playable in achievements/matchmaking.
+const List<String> kPlayableArcadeIds = <String>[
+  'kart_racing', 'obstacle_race', 'bomb_arena', 'pool8',
+  'mini_golf', 'basketball_battle', 'spy_mafia',
+];
+
 const List<String> kArcadeMultiIds = <String>[
   'kart_racing',
   'obstacle_race',

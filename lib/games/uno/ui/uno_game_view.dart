@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../../core/theme/nx_theme.dart';
 import '../../../core/widgets/nx_widgets.dart';
@@ -350,7 +349,7 @@ class _UnoGameViewState extends State<UnoGameView>
       math.min(84.0, MediaQuery.of(context).size.width / 4.8);
 
   void _haptic() {
-    if (_l.soundOn) HapticFeedback.selectionClick();
+    _l.hapticSelection();
   }
 
   // ------------------------------------------------------------- flights
@@ -507,13 +506,13 @@ class _UnoGameViewState extends State<UnoGameView>
         case UnoEventType.nxCall:
           notes.add(_tx('${_name(e.player)}: NX!', '${_name(e.player)}: NX!'));
           noteColor = NxColors.gold;
-          if (_l.soundOn) HapticFeedback.mediumImpact();
+          _l.hapticMedium();
           break;
         case UnoEventType.nxCaught:
           notes.add(_tx('${_name(e.player)} NX نگفت! +۲ جریمه',
               '${_name(e.player)} forgot NX! +2 penalty'));
           noteColor = NxColors.danger;
-          if (_l.soundOn) HapticFeedback.heavyImpact();
+          _l.hapticHeavy();
           break;
         case UnoEventType.reshuffle:
           notes.add(_tx('دسته بُر خورد', 'Discard pile reshuffled'));

@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../arcade_kit/arcade_controls.dart';
 import '../../arcade_kit/arcade_fx.dart';
@@ -162,10 +161,10 @@ class _BasketGameState extends ArcadeLoopState<BasketGame> {
       switch (e.kind) {
         case 'go':
           _say('GO!', 0.7);
-          HapticFeedback.lightImpact();
+          l.hapticLight();
         case 'horn':
           _say(l.tx('پایان وقت!', "TIME'S UP!"), 2);
-          HapticFeedback.heavyImpact();
+          l.hapticHeavy();
         case 'swish':
         case 'score':
           _netSway = 1;
@@ -175,7 +174,7 @@ class _BasketGameState extends ArcadeLoopState<BasketGame> {
           fx.text('+${e.value}', at - Offset(0, 46 * _lay.scale), e.kind == 'swish' ? const Color(0xFF7CFF7A) : Colors.white,
               size: 30);
           if (e.kind == 'swish') _say(l.tx('سوییش!', 'SWISH!'));
-          HapticFeedback.mediumImpact();
+          l.hapticMedium();
         case 'fire':
           _say(l.tx('آتشین! امتیاز دوبرابر', 'ON FIRE! x2'), 1.4);
           fx.flashScreen(const Color(0xFFFF6A1D), 0.25);
@@ -184,10 +183,10 @@ class _BasketGameState extends ArcadeLoopState<BasketGame> {
         case 'rim':
           _netSway = math.max(_netSway, 0.5);
           fx.burst(at, Colors.white, count: 6, speed: 100, size: 2);
-          HapticFeedback.selectionClick();
+          l.hapticSelection();
         case 'board':
           fx.shake(1.5);
-          HapticFeedback.selectionClick();
+          l.hapticSelection();
         case 'floor':
         case 'miss':
           break;
@@ -256,7 +255,7 @@ class _BasketGameState extends ArcadeLoopState<BasketGame> {
     _swipeA = null;
     if (a == null || _swipe.isEmpty) return;
     final Offset v = (_swipe.last - a) / _lay.scale;
-    if (court.throwBall(v.dx, v.dy)) HapticFeedback.lightImpact();
+    if (court.throwBall(v.dx, v.dy)) l.hapticLight();
     _swipe.clear();
   }
 

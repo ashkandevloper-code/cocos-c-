@@ -12,6 +12,7 @@ class ArcadePadButton extends StatefulWidget {
     this.onDown,
     this.onUp,
     this.enabled = true,
+    this.hapticsOn = false,
     this.badge,
   });
   final IconData icon;
@@ -21,6 +22,7 @@ class ArcadePadButton extends StatefulWidget {
   final VoidCallback? onDown;
   final VoidCallback? onUp;
   final bool enabled;
+  final bool hapticsOn;
   final Widget? badge;
 
   @override

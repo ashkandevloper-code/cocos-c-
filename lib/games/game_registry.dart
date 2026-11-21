@@ -14,7 +14,7 @@ import 'uno/uno_entry.dart';
 
 export 'core/game_contract.dart';
 
-/// GameRegistry (STEP_16): the nine ANIX ARCADE games.
+/// Executable game registry: nine original games plus seven arcade entries.
 final List<GameInfo> kGames = <GameInfo>[
   GameInfo(
     id: 'finger_soccer',

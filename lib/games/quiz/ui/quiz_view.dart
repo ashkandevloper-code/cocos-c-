@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../../core/theme/nx_theme.dart';
 import '../../../core/widgets/nx_widgets.dart';
@@ -153,11 +152,11 @@ class _QuizViewState extends State<QuizView> with TickerProviderStateMixin {
   int get _elapsedMs => (_clock.value * QuizEngine.timeLimitMs).round();
 
   void _haptic([bool heavy = false]) {
-    if (!_l.soundOn) return;
+    if (!_l.hapticsOn) return;
     if (heavy) {
-      HapticFeedback.mediumImpact();
+      _l.hapticMedium();
     } else {
-      HapticFeedback.selectionClick();
+      _l.hapticSelection();
     }
   }
 

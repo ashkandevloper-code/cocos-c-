@@ -181,6 +181,7 @@ class _FsOnlinePickState extends State<FsOnlinePick> {
       players: widget.players,
       side: 0,
       fixedSide: 0,
+      allowCustom: false,
       countdown: widget.teamSeconds,
       freeze: widget.freeze,
       topLane: widget.topLane,
@@ -195,6 +196,7 @@ class _FsOnlinePickState extends State<FsOnlinePick> {
       FsShop(
         fa: true,
         team: _teams[0],
+        allowCustom: false,
         topLane: widget.topLane,
         onTeam: (String t) => setState(() => _teams[0] = t),
         onBack: () => setState(() => _shop = false),

@@ -9,9 +9,10 @@ import 'mini_golf/mini_golf_entry.dart';
 import 'basketball_battle/basketball_battle_entry.dart';
 import 'spy_mafia/spy_mafia_entry.dart';
 
-/// ANIX ARCADE expansion (redesign-2): 20 new games ADDED next to the original nine (none replaced).
-/// Multiplayer games: bots offline + online rooms / quick match / invites / tournaments on the games project.
-/// Solo games: quick start, daily challenge, server-validated global boards.
+/// Seven executable arcade games alongside the original nine (none replaced).
+/// The other 13 proposed arcade IDs have metadata/skin.json only; see the quality audit.
+/// Multiplayer is wired through the games project but server-side rules validation
+/// and real-device QA are still required before claiming competitive fairness.
 final List<GameInfo> kArcadeGames = <GameInfo>[
   GameInfo(
     id: 'kart_racing',

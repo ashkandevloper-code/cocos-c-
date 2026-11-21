@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../../core/theme/nx_theme.dart';
 import '../../../core/widgets/nx_widgets.dart';
@@ -100,7 +99,7 @@ class _MafiaVsBotViewState extends State<MafiaVsBotView> {
   }
 
   void _haptic() {
-    if (_l.soundOn) HapticFeedback.mediumImpact();
+    _l.hapticMedium();
   }
 
   double _hue(int id) => id == MafiaMatch.humanId ? 265 : (_m.personas[id]?.hue ?? 200);
@@ -256,7 +255,7 @@ class _MafiaVsBotViewState extends State<MafiaVsBotView> {
         _voteFeed.add(en);
         if (en.value != null) _liveVotes[en.value!] = (_liveVotes[en.value!] ?? 0) + 1;
       });
-      if (en.value != null && _l.soundOn) HapticFeedback.selectionClick();
+      if (en.value != null) _l.hapticSelection();
       _after(420, () => step(i + 1));
     }
 
@@ -586,7 +585,7 @@ class _MafiaVsBotViewState extends State<MafiaVsBotView> {
             center: _centerHolo(),
             onTap: (int id) {
               setState(() => _selected = id);
-              if (_l.soundOn) HapticFeedback.selectionClick();
+              _l.hapticSelection();
             },
           ),
         ),

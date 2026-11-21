@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../../core/theme/nx_theme.dart';
 import '../../core/game_contract.dart';
@@ -102,7 +101,7 @@ class _MafiaNarratorViewState extends State<MafiaNarratorView> {
   String _join(Iterable<String> xs) => xs.join(_fa ? '، ' : ', ');
 
   void _haptic() {
-    if (_l.soundOn) HapticFeedback.mediumImpact();
+    _l.hapticMedium();
   }
 
   // ===================================================================== flow
@@ -257,7 +256,7 @@ class _MafiaNarratorViewState extends State<MafiaNarratorView> {
       if (!mounted || _paused) return;
       if (_secondsLeft <= 0) return;
       setState(() => _secondsLeft--);
-      if (_secondsLeft == 0 && _l.soundOn) HapticFeedback.heavyImpact();
+      if (_secondsLeft == 0) _l.hapticHeavy();
     });
   }
 
@@ -283,7 +282,7 @@ class _MafiaNarratorViewState extends State<MafiaNarratorView> {
         _defendants.add(id);
       }
     });
-    if (_l.soundOn) HapticFeedback.selectionClick();
+    _l.hapticSelection();
   }
 
   void _startDefense() {
@@ -587,7 +586,7 @@ class _MafiaNarratorViewState extends State<MafiaNarratorView> {
             _peeking = true;
             _peekedOnce = true;
           });
-          if (_l.soundOn) HapticFeedback.selectionClick();
+          _l.hapticSelection();
         },
         onPointerUp: (PointerUpEvent _) => setState(() => _peeking = false),
         onPointerCancel: (PointerCancelEvent _) => setState(() => _peeking = false),
@@ -716,7 +715,7 @@ class _MafiaNarratorViewState extends State<MafiaNarratorView> {
         GestureDetector(
           onTap: () {
             setState(() => _sel = id);
-            if (_l.soundOn) HapticFeedback.selectionClick();
+            _l.hapticSelection();
           },
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 160),

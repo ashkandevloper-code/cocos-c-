@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../arcade_kit/arcade_controls.dart';
 import '../../arcade_kit/arcade_fx.dart';
@@ -111,10 +110,10 @@ class _ObstacleGameState extends ArcadeLoopState<ObstacleGame> {
     if (before > 0) {
       if (race.countdown <= 0) {
         _say('GO!', 0.8);
-        HapticFeedback.mediumImpact();
+        l.hapticMedium();
       } else {
         _say('${race.countdown.ceil()}', 1);
-        if (before.ceil() != race.countdown.ceil()) HapticFeedback.selectionClick();
+        if (before.ceil() != race.countdown.ceil()) l.hapticSelection();
       }
     } else if (_bannerT > 0) {
       _bannerT -= dt;
@@ -164,24 +163,24 @@ class _ObstacleGameState extends ArcadeLoopState<ObstacleGame> {
       switch (e.kind) {
         case 'jump':
           fx.burst(at, Colors.white70, count: 6, speed: 90, kind: ParticleKind.smoke, size: 6, life: 0.5);
-          if (mineEv) HapticFeedback.selectionClick();
+          if (mineEv) l.hapticSelection();
         case 'land':
           if (mineEv) fx.burst(at, Colors.white38, count: 4, speed: 60, kind: ParticleKind.smoke, size: 5, life: 0.35);
         case 'knock' || 'squash':
           fx.burst(at, const Color(0xFFFFD34E), count: 18, speed: 260);
           if (mineEv) {
             fx.shake(8);
-            HapticFeedback.mediumImpact();
+            l.hapticMedium();
           }
         case 'bump':
           fx.ring(at, skin.accent2, size: 26, life: 0.3);
-          if (mineEv) HapticFeedback.lightImpact();
+          if (mineEv) l.hapticLight();
         case 'fall':
           fx.ring(at, const Color(0xFFFF2D55), size: 34, life: 0.5);
           if (mineEv) {
             _say(l.tx('افتادی!', 'FELL!'), 0.9);
             fx.flashScreen(const Color(0xFFFF2D55), 0.25);
-            HapticFeedback.heavyImpact();
+            l.hapticHeavy();
           }
         case 'respawn':
           fx.ring(at, skin.accent, size: 30, life: 0.5);
@@ -189,7 +188,7 @@ class _ObstacleGameState extends ArcadeLoopState<ObstacleGame> {
           if (mineEv) {
             _say(l.tx('ایست بازرسی', 'CHECKPOINT'), 1.0);
             fx.ring(at, const Color(0xFF7CFF7A), size: 40, life: 0.5);
-            HapticFeedback.lightImpact();
+            l.hapticLight();
           }
         case 'finish':
           fx.burst(at, skin.player(e.seat), count: 30, speed: 260, kind: ParticleKind.orb, size: 5);
@@ -197,13 +196,13 @@ class _ObstacleGameState extends ArcadeLoopState<ObstacleGame> {
             final int place = race.finishedCount;
             _say(l.tx('رسیدی! نفر ${ordinalFa(place)}', 'FINISHED ${ordinalEn(place)}!'), 3);
             fx.confetti(at, count: 60);
-            HapticFeedback.heavyImpact();
+            l.hapticHeavy();
           }
         case 'dnf':
           if (mineEv) {
             _say(l.tx('حذف شدی!', 'ELIMINATED!'), 3);
             fx.flashScreen(const Color(0xFFFF2D55), 0.35);
-            HapticFeedback.heavyImpact();
+            l.hapticHeavy();
           }
         case 'out':
           fx.burst(at, skin.player(e.seat), count: 24, speed: 220, kind: ParticleKind.orb, size: 5);
@@ -494,6 +493,7 @@ class _ObstacleGameState extends ArcadeLoopState<ObstacleGame> {
           right: pad.right + 18,
           bottom: pad.bottom + 22,
           child: ArcadePadButton(
+                hapticsOn: l.hapticsOn,
             icon: Icons.keyboard_double_arrow_up_rounded,
             label: l.tx('پرش', 'JUMP'),
             color: skin.accent,
