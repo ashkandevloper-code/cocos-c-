@@ -1,6 +1,8 @@
 name: ANIX PRO Manual Android APK Build
 
 on:
+  push:
+    branches: ['work/anix-visual-upgrade']
   workflow_dispatch:
     inputs:
       release_tag:
