@@ -1,0 +1,22 @@
+name: ANIX PRO Manual Android APK Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Optional release tag; leave empty to upload build artifacts only.
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  android-release:
+    permissions:
+      contents: write
+    uses: ./.github/workflows/android_release_build.yml
+    with:
+      release_tag: ${{ inputs.release_tag }}
+    secrets: inherit
