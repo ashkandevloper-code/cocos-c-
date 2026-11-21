@@ -447,7 +447,7 @@ class _FsShopState extends State<FsShop> {
             child: !widget.allowCustom
                 ? fsGreyButton('فقط بازی محلی', 120, 27, size: 11)
                 : !shop.customEntitled
-                    ? fsBuyButton('خرید', kFsCustomPrice, 120, 27, size: 12)
+                    ? fsBuyButton('خرید', kFsCustomPrice, 138, 27, size: 12)
                     : !ready
                         ? fsLimeButton('انتخاب عکس', 120, 27, size: 12)
                         : chosen
