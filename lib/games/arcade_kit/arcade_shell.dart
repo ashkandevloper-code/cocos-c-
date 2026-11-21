@@ -217,9 +217,10 @@ class _ArcadeSoloShellState extends ConsumerState<ArcadeSoloShell> with TickerPr
   Widget _chip(IconData i, String t, Color c) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
         decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.35),
+          color: Colors.black.withValues(alpha: 0.52),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: c.withValues(alpha: 0.6)),
+          boxShadow: <BoxShadow>[BoxShadow(color: c.withValues(alpha: 0.16), blurRadius: 10)],
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: <Widget>[
           Icon(i, size: 13, color: c),
@@ -235,17 +236,34 @@ class _ArcadeSoloShellState extends ConsumerState<ArcadeSoloShell> with TickerPr
       behavior: HitTestBehavior.opaque,
       onTap: _start,
       child: Container(
-        color: Colors.black.withValues(alpha: 0.38),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.46),
+          gradient: RadialGradient(
+            center: Alignment.center,
+            radius: 0.9,
+            colors: <Color>[s.accent.withValues(alpha: 0.12), Colors.transparent],
+          ),
+        ),
         alignment: Alignment.center,
         child: Column(mainAxisSize: MainAxisSize.min, children: <Widget>[
-          Text(l.tx(widget.titleFa, widget.titleEn),
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 34,
-                fontWeight: FontWeight.w900,
-                color: Colors.white,
-                shadows: <Shadow>[Shadow(color: s.accent, blurRadius: 24), const Shadow(color: Colors.black, blurRadius: 6)],
-              )),
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 22),
+            padding: const EdgeInsets.fromLTRB(24, 22, 24, 20),
+            decoration: BoxDecoration(
+              color: const Color(0xD90B1020),
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: s.accent.withValues(alpha: 0.42)),
+              boxShadow: <BoxShadow>[BoxShadow(color: s.accent.withValues(alpha: 0.18), blurRadius: 28)],
+            ),
+            child: Column(mainAxisSize: MainAxisSize.min, children: <Widget>[
+              Text(l.tx(widget.titleFa, widget.titleEn),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 34,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    shadows: <Shadow>[Shadow(color: s.accent, blurRadius: 24), const Shadow(color: Colors.black, blurRadius: 6)],
+                  )),
           if (l.daily)
             Padding(
               padding: const EdgeInsets.only(top: 8),
@@ -277,6 +295,8 @@ class _ArcadeSoloShellState extends ConsumerState<ArcadeSoloShell> with TickerPr
           if (_best > 0)
             Text(l.tx('رکورد شخصی: $_best', 'Personal best: $_best'),
                 style: const TextStyle(color: Color(0xFFFFC94A), fontWeight: FontWeight.w800)),
+            ]),
+          ),
         ]),
       ),
     );

@@ -27,6 +27,9 @@ jobs:
       - name: Install locked dependencies
         run: flutter pub get --enforce-lockfile
 
+      - name: Validate ANIX game scope and evidence contracts
+        run: python3 tool/validate_anix_scope.py
+
       - name: Analyze
         run: |
           set -o pipefail

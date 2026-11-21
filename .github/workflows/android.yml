@@ -1,15 +1,7 @@
 name: ANIX PRO Android Build
 
 on:
-  # Direct diagnostic build; publication remains disabled without a validated release tag.
-  workflow_dispatch:
-    inputs:
-      release_tag:
-        description: Optional release tag; leave empty for a validation build only.
-        required: false
-        type: string
-        default: ''
-  # Invoked by full_release_validation after all required quality gates pass.
+  # Invoked only by full_release_validation after all required quality gates pass.
   workflow_call:
     inputs:
       release_tag:
@@ -80,49 +72,33 @@ jobs:
           channel: stable
           cache: true
 
-      # Same signing key on every build so a new APK installs over the previous one.
-      # The repository secret is the durable source of truth; Actions cache is only
-      # a convenience and must never silently rotate the app signing identity.
-      # restore-only: a run that misses the cache must never save (and thereby rotate) a new signing identity.
-      - name: Restore signing key
-        uses: actions/cache/restore@v4
-        with:
-          path: ~/.android/debug.keystore
-          key: nxg-signing-key-v1
-
-      - name: Create signing key (first run only)
+      # Never mint or cache a signing key in CI. A missing secret must fail the
+      # release rather than silently producing an APK that cannot safely update
+      # the installed product. The supplied keystore must be the repository's
+      # deliberate upload/release key (not a generated debug key).
+      - name: Restore required release signing key
+        if: github.event_name != 'schedule'
         env:
-          NEXORA_KEYSTORE_B64: ${{ secrets.NEXORA_KEYSTORE_B64 }}
+          ANIX_KEYSTORE_B64: ${{ secrets.NEXORA_KEYSTORE_B64 }}
         run: |
+          set -euo pipefail
           mkdir -p ~/.android
-          # Optional repo secret wins; otherwise the cached key; otherwise mint this repo's permanent key once.
-          if [ -n "$NEXORA_KEYSTORE_B64" ]; then echo "$NEXORA_KEYSTORE_B64" | base64 -d > ~/.android/debug.keystore; fi
-          if [ ! -f ~/.android/debug.keystore ]; then
-            if [ "${{ github.event_name }}" = "schedule" ]; then
-              echo "::error::Signing key cache missing on the keep-alive run; it is minted again by the next push." ; exit 1
-            fi
-            echo "::warning::No signing key found; generating this repo's permanent key (first run only)."
-            keytool -genkeypair -v -keystore ~/.android/debug.keystore -storepass android -keypass android \
-              -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=ANIX,O=ANIX,C=US" >/dev/null 2>&1
-            echo "KEY_NEW=true" >> $GITHUB_ENV
-          fi
-          if ! keytool -list -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey >/dev/null 2>&1; then
-            echo "ERROR: signing key is invalid or does not contain alias androiddebugkey." >&2
+          if [ -z "${ANIX_KEYSTORE_B64:-}" ]; then
+            echo "::error title=Missing release signing key::NEXORA_KEYSTORE_B64 is required; CI will not generate a fallback key." >&2
             exit 1
           fi
+          printf '%s' "$ANIX_KEYSTORE_B64" | base64 --decode > ~/.android/debug.keystore
+          test -s ~/.android/debug.keystore
+          keytool -list -keystore ~/.android/debug.keystore -storepass android >/dev/null 2>&1 || {
+            echo "ERROR: configured release keystore cannot be opened with the documented CI password." >&2
+            exit 1
+          }
           # Public certificate fingerprint only (never the key itself).
-          keytool -list -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey | grep -E 'SHA256:' || true
+          keytool -list -v -keystore ~/.android/debug.keystore -storepass android | grep -E 'SHA256:' || true
 
       - name: Keep-alive run stops here
         if: github.event_name == 'schedule'
         run: echo "signing key cache touched" && echo "KEEPALIVE=true" >> $GITHUB_ENV
-
-      - name: Save new signing key (first run only)
-        if: env.KEY_NEW == 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: ~/.android/debug.keystore
-          key: nxg-signing-key-v1
 
       - name: Generate Android platform (if missing)
         if: env.KEEPALIVE != 'true'

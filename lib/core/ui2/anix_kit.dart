@@ -836,7 +836,21 @@ class _AnixGameCardState extends State<AnixGameCard> {
       child: AnimatedScale(
         scale: _down ? 0.97 : 1,
         duration: const Duration(milliseconds: 110),
-        child: LayoutBuilder(builder: (BuildContext context, BoxConstraints c) {
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: <BoxShadow>[
+              BoxShadow(
+                color: Colors.black.withValues(alpha: _down ? 0.18 : 0.42),
+                blurRadius: _down ? 8 : 18,
+                offset: Offset(0, _down ? 3 : 9),
+              ),
+              if (!_down) const BoxShadow(color: Color(0x2618D9FF), blurRadius: 20, spreadRadius: -5),
+            ],
+          ),
+          child: LayoutBuilder(builder: (BuildContext context, BoxConstraints c) {
           final double w = c.maxWidth, h = c.maxHeight;
           Rect at(Rect f) => Rect.fromLTRB(f.left * w, f.top * h, f.right * w, f.bottom * h);
           final Rect win = at(AnixGameCard.window);
@@ -853,6 +867,10 @@ class _AnixGameCardState extends State<AnixGameCard> {
                   cacheWidth: (w * 2.4).round(),
                   errorBuilder: (_, __, ___) => const SizedBox.shrink()),
             ),
+            Positioned.fromRect(
+              rect: win,
+              child: IgnorePointer(child: CustomPaint(painter: _AnixCardSheenPainter())),
+            ),
             if (widget.overlay != null) Positioned.fromRect(rect: win, child: widget.overlay!),
             Positioned.fromRect(rect: foot, child: widget.footer),
           ]);
@@ -860,6 +878,29 @@ class _AnixGameCardState extends State<AnixGameCard> {
       ),
     );
   }
+}
+
+class _AnixCardSheenPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Rect bounds = Offset.zero & size;
+    final Paint wash = Paint()
+      ..shader = ui.Gradient.linear(
+        Offset(size.width * 0.05, 0),
+        Offset(size.width * 0.9, size.height),
+        <Color>[Colors.white.withValues(alpha: 0.12), Colors.transparent, Colors.black.withValues(alpha: 0.16)],
+        <double>[0, 0.28, 1],
+      );
+    canvas.drawRRect(RRect.fromRectAndRadius(bounds, const Radius.circular(14)), wash);
+    final Paint rim = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.1
+      ..color = Colors.white.withValues(alpha: 0.22);
+    canvas.drawRRect(RRect.fromRectAndRadius(bounds.deflate(1), const Radius.circular(13)), rim);
+  }
+
+  @override
+  bool shouldRepaint(covariant _AnixCardSheenPainter oldDelegate) => false;
 }
 
 // ------------------------------------------------------------------------------------------ rank + avatars
