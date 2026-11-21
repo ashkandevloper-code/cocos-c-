@@ -71,8 +71,8 @@ Widget _host(GameInfo g) =>
     GameHostPage(game: g, mode: GameMode.vsBot, difficulty: BotDifficulty.normal, players: g.defaultPlayers);
 
 void main() {
-  const List<String> reportedGames = <String>['finger_soccer', 'pool8', 'mini_golf', 'basketball_battle', 'spy_mafia'];
-
+  // Every executable registry entry gets an EN/LTR and FA/RTL launch smoke
+  // check. This is NOT an end-to-end win/loss or real-device online test.
   final Map<String, (Widget Function(), Type)> screens = <String, (Widget Function(), Type)>{
     'main menu (hub)': (() => const HubPage(), HubPage),
     'arcade (PLAY)': (() => const ArcadePage(), ArcadePage),
@@ -81,9 +81,9 @@ void main() {
     'chat (orbit network)': (() => const OrbitNetworkPage(), OrbitNetworkPage),
     'sign-in': (() => const AuthPage(), AuthPage),
     'sign-in required': (() => const SignInRequiredPage(from: '/social'), SignInRequiredPage),
-    for (final String id in reportedGames) ...<String, (Widget Function(), Type)>{
-      'game setup $id': (() => GameSetupPage(gameId: id), GameSetupPage),
-      'game $id vs bot': (() => _host(gameById(id)!), GameHostPage),
+    for (final GameInfo g in kGames) ...<String, (Widget Function(), Type)>{
+      'game setup ${g.id}': (() => GameSetupPage(gameId: g.id), GameSetupPage),
+      'game ${g.id} vs bot': (() => _host(g), GameHostPage),
     },
   };
 

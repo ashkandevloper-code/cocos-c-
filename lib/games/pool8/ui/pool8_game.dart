@@ -509,7 +509,7 @@ class _Pool8GameState extends ArcadeLoopState<Pool8Game> {
         onPanStart: _panStart,
         onPanUpdate: _panUpdate,
         onPanEnd: (_) => _movingCue = false,
-        child: CustomPaint(painter: ArcadePainter(_paint, frame), size: Size.infinite),
+        child: flameCanvas(_paint),
       ),
       ValueListenableBuilder<int>(
         valueListenable: frame,

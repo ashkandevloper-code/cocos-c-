@@ -78,6 +78,11 @@ abstract class NetLink {
   /// Send an input for [asSeat] (defaults to [mySeat]). Applied locally by the caller.
   Future<bool> send(Map<String, dynamic> data, {String kind = 'move', String? hash, int? asSeat});
 
+  /// Verified self-forfeit RPC; returns false if the server did not accept it.
+  /// A game must not display a confirmed withdrawal just because it logged a
+  /// client-side `forfeit` move (the write may have failed or raced settlement).
+  Future<bool> forfeit();
+
   /// Ephemeral, unordered real-time messages (aim previews, emotes, chat). Not logged.
   void sendLive(String event, Map<String, dynamic> data);
   Stream<NetLiveMessage> get live;

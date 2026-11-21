@@ -84,6 +84,54 @@ class LuxeGlass extends StatelessWidget {
   }
 }
 
+/// Station Luxe's rounded surface without a backdrop filter. Use this for
+/// scrolling lists (the home-style rim/shadow remains, but each row does not
+/// create a costly offscreen blur layer).
+class LuxeSurface extends StatelessWidget {
+  const LuxeSurface({
+    super.key,
+    required this.child,
+    this.radius = 26,
+    this.padding = EdgeInsets.zero,
+    this.color,
+    this.borderColor = Luxe.line,
+    this.glow = 0,
+  });
+  final Widget child;
+  final double radius;
+  final EdgeInsetsGeometry padding;
+  final Color? color;
+  final Color borderColor;
+  final double glow;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: padding,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(radius),
+          border: Border.all(color: borderColor),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: <Color>[
+              Color.lerp(color ?? Luxe.panel, Luxe.gold, 0.055)!,
+              color ?? Luxe.panel,
+            ],
+          ),
+          boxShadow: glow <= 0
+              ? const <BoxShadow>[]
+              : <BoxShadow>[
+                  BoxShadow(
+                    color: Luxe.gold.withValues(alpha: (glow * 0.24).clamp(0.0, 0.35)),
+                    blurRadius: 28,
+                    spreadRadius: -8,
+                  ),
+                ],
+        ),
+        child: child,
+      );
+}
+
 /// Pressable with a soft scale, used by every Luxe card and button.
 class LuxePress extends StatefulWidget {
   const LuxePress({super.key, required this.child, this.onTap, this.semantics});
@@ -122,10 +170,15 @@ class _LuxePressState extends State<LuxePress> {
 
 /// The ambient hub scene: warm radial light, the station art and the dark vignette.
 class LuxeScene extends StatelessWidget {
-  const LuxeScene({super.key, required this.child, this.artOpacity = 0.6, this.tint});
+  const LuxeScene({super.key, required this.child, this.artOpacity = 0.6, this.tint,
+    this.animatedDust = true});
   final Widget child;
   final double artOpacity;
   final Color? tint;
+
+  /// The home ring uses ambient motion; dense secondary pages keep the same
+  /// lighting without an extra animation ticker or overdraw behind lists.
+  final bool animatedDust;
 
   @override
   Widget build(BuildContext context) {
@@ -159,7 +212,7 @@ class LuxeScene extends StatelessWidget {
           ),
         ),
       ),
-      const RepaintBoundary(child: LuxeDust()),
+      if (animatedDust) const RepaintBoundary(child: LuxeDust()),
       child,
     ]);
   }

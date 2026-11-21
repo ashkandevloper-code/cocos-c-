@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/profile/profile_service.dart';
+import '../../../core/online/online_service.dart';
+import '../../../core/widgets/profile_preview.dart';
 import '../../../core/settings/app_settings.dart';
 import '../../../core/theme/nx_theme.dart';
 import '../../../core/widgets/nx_widgets.dart';
@@ -26,6 +28,7 @@ class NovaPostCard extends ConsumerWidget {
     final profile = ref.watch(profileProvider);
     final String me = profile.explorerId;
     final bool mine = post.authorId == me;
+    final String authorUid = mine ? (ref.read(onlineProvider).uid ?? post.authorId) : post.authorId;
     final bool liked = post.likedByUser(me);
     final bool saved = ctrl.saved.contains(post.id);
     final String text = post.textFor(context.isFa);
@@ -38,14 +41,24 @@ class NovaPostCard extends ConsumerWidget {
         borderColor: post.official ? NxColors.electricBlue.withValues(alpha: 0.5) : null,
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: <Widget>[
           Row(children: <Widget>[
-            NovaAvatar(name: post.authorName, official: post.official, size: 40),
+            Semantics(
+              button: true,
+              label: context.tx('نمایش پروفایل ${post.authorName}', 'View ${post.authorName} profile'),
+              child: GestureDetector(
+                onTap: () => showProfilePreview(context, authorUid, name: post.authorName),
+                child: NovaAvatar(name: post.authorName, official: post.official, size: 40),
+              ),
+            ),
             const SizedBox(width: 10),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
                 Row(children: <Widget>[
                   Flexible(
-                    child: Text(post.authorName,
-                        overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800)),
+                    child: GestureDetector(
+                      onTap: () => showProfilePreview(context, authorUid, name: post.authorName),
+                      child: Text(post.authorName,
+                          overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800)),
+                    ),
                   ),
                   if (post.official) ...<Widget>[
                     const SizedBox(width: 4),
@@ -289,6 +302,9 @@ class _CommentsSheetState extends ConsumerState<_CommentsSheet> {
                       final cm = comments[i];
                       return ListTile(
                         contentPadding: EdgeInsets.zero,
+                        onTap: () => showProfilePreview(context,
+                            cm.authorId == me ? (ref.read(onlineProvider).uid ?? cm.authorId) : cm.authorId,
+                            name: cm.authorName),
                         leading: NovaAvatar(name: cm.authorName, size: 34),
                         title: Row(children: <Widget>[
                           Flexible(child: Text(cm.authorName, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13))),

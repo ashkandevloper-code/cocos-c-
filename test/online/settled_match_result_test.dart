@@ -36,6 +36,17 @@ void main() {
     }
   });
 
+  test('a solo withdrawal waits for team settlement; disputed and closed are not draws', () {
+    expect(matchSettlementView(null), MatchSettlementView.waiting);
+    expect(matchSettlementView(null, withdrawalRequested: true), MatchSettlementView.withdrawal);
+    expect(matchSettlementView(const MatchEnd(status: 'disputed', reason: 'disputed', winners: <int>[])),
+        MatchSettlementView.disputed);
+    expect(matchSettlementView(const MatchEnd(status: 'abandoned', reason: 'all_forfeited', winners: <int>[])),
+        MatchSettlementView.closed);
+    expect(matchSettlementView(const MatchEnd(status: 'finished', reason: 'forfeit:0', winners: <int>[1])),
+        MatchSettlementView.settled);
+  });
+
   test('forfeit gets the outcome stored by server, never the optimistic result', () {
     const MatchEnd end = MatchEnd(status: 'finished', reason: 'forfeit:0', winners: <int>[1]);
     expect(end.isForfeit, isTrue);

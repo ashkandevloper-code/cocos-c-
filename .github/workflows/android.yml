@@ -247,6 +247,14 @@ jobs:
         if: env.KEEPALIVE != 'true'
         run: flutter pub get
 
+      # PostgreSQL-compatible isolated fixtures. These do not replace applying
+      # migrations to staging or verifying RLS against the hosted games project.
+      - name: Synthetic games SQL tests
+        if: env.KEEPALIVE != 'true'
+        run: |
+          npm ci --prefix tool/sql_tests --ignore-scripts
+          npm test --prefix tool/sql_tests
+
       - name: Analyze
         if: env.KEEPALIVE != 'true'
         run: |

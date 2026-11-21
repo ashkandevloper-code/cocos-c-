@@ -462,7 +462,7 @@ class _BombGameState extends ArcadeLoopState<BombGame> {
       final double band = BombLayout.controlsHeight + pad.bottom;
       final double bombSize = math.min(96, math.max(72, size.width * 0.22));
       return Stack(fit: StackFit.expand, children: <Widget>[
-        CustomPaint(painter: ArcadePainter(_paint, frame), size: Size.infinite),
+        flameCanvas(_paint),
         ValueListenableBuilder<int>(
           valueListenable: frame,
           builder: (_, __, ___) {

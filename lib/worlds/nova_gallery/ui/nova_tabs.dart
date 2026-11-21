@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/profile/profile_service.dart';
+import '../../../core/online/online_service.dart';
+import '../../../core/widgets/profile_preview.dart';
 import '../../../core/settings/app_settings.dart';
 import '../../../core/theme/nx_theme.dart';
 import '../../../core/widgets/nx_widgets.dart';
@@ -215,12 +217,22 @@ class NovaReelsTab extends ConsumerWidget {
                   bottom: 16,
                   end: 80,
                   child: Row(children: <Widget>[
-                    NovaAvatar(name: p.authorName, official: p.official, size: 34),
+                    GestureDetector(
+                      onTap: () => showProfilePreview(c,
+                          p.authorId == me ? (ref.read(onlineProvider).uid ?? p.authorId) : p.authorId,
+                          name: p.authorName),
+                      child: NovaAvatar(name: p.authorName, official: p.official, size: 34),
+                    ),
                     const SizedBox(width: 8),
                     Flexible(
-                      child: Text(p.authorName,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.white)),
+                      child: GestureDetector(
+                        onTap: () => showProfilePreview(c,
+                            p.authorId == me ? (ref.read(onlineProvider).uid ?? p.authorId) : p.authorId,
+                            name: p.authorName),
+                        child: Text(p.authorName,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.white)),
+                      ),
                     ),
                     if (p.official) ...<Widget>[
                       const SizedBox(width: 4),

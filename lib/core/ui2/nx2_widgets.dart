@@ -11,37 +11,39 @@ import 'package:go_router/go_router.dart';
 import '../profile/profile_service.dart';
 import '../settings/app_settings.dart';
 import 'anix_kit.dart';
+import 'luxe.dart';
 import 'nx2_assets.dart';
 import '../../worlds/oracle_core/persona/oracle_tour.dart';
 import '../../worlds/hub/hub_search.dart';
 
-/// NX2 colour tokens, re-based on the ANIX PRO Station Luxe palette (deep black, gold, champagne).
+/// Legacy NX2 names are preserved for callers, but every piece of app chrome
+/// gets its palette from the Home Page's Station Luxe design tokens.
 class Nx2 {
   Nx2._();
-  static const Color deep = Color(0xFF07080C);
-  static const Color night = Color(0xFF11100C);
-  static const Color plum = Color(0xFF1C1912);
-  static const Color violet = Color(0xFF8A6A2C);
-  static const Color magenta = Color(0xFFD9B872);
-  static const Color cyan = Color(0xFFF6E7BD);
-  static const Color gold = Color(0xFFD9B872);
-  static const Color goldDeep = Color(0xFF8A6A2C);
-  static const Color text = Color(0xFFF4EAD2);
+  static const Color deep = Luxe.bg;
+  static const Color night = Luxe.panel;
+  static const Color plum = Color(0xFF1C1A14);
+  static const Color violet = Luxe.gold3;
+  static const Color magenta = Luxe.gold;
+  static const Color cyan = Luxe.gold2;
+  static const Color gold = Luxe.gold;
+  static const Color goldDeep = Luxe.gold3;
+  static const Color text = Luxe.ink;
   static const Color muted = Color(0xFFB9AE95);
   static const Color success = Color(0xFF4BE3A0);
   static const Color danger = Color(0xFFFF5A7A);
 
   static const LinearGradient neon =
-      LinearGradient(colors: <Color>[cyan, violet, magenta]);
+      LinearGradient(colors: <Color>[Luxe.gold2, Luxe.gold, Luxe.gold3]);
   static const LinearGradient goldGrad =
-      LinearGradient(colors: <Color>[Color(0xFFF6E7BD), gold, goldDeep]);
+      LinearGradient(colors: <Color>[Luxe.gold2, Luxe.gold, Luxe.gold3]);
 
   static const TextStyle title = TextStyle(
       fontSize: 18,
-      fontWeight: FontWeight.w900,
+      fontWeight: FontWeight.w800,
       letterSpacing: 0.8,
       color: text,
-      shadows: <Shadow>[Shadow(color: Color(0xAA8B3DFF), blurRadius: 12)]);
+      shadows: <Shadow>[Shadow(color: Color(0x55D9B872), blurRadius: 10)]);
   static const TextStyle label =
       TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: text);
 }
@@ -49,7 +51,8 @@ class Nx2 {
 /// Scene art behind a page: the ANIX world hub / social / arcade backgrounds, or the NX2 castle/room.
 enum Nx2Scene { castle, room, hub, social, arcade, voiceStage, trophyHall, panorama }
 
-/// The cosmic castle backdrop (main), the room backdrop or an ANIX scene background, darkened for contrast.
+/// Secondary screens share the Home Page's black/gold lighting and station
+/// artwork. A world scene is a faint accent, never a different page skin.
 class Nx2Background extends StatelessWidget {
   const Nx2Background(
       {super.key, this.child, this.room = false, this.dim = 0.45, this.scene});
@@ -73,34 +76,39 @@ class Nx2Background extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Size s = MediaQuery.sizeOf(context);
-    final int cw = (math.min(s.width, 600) * 2).round();
-    return Stack(fit: StackFit.expand, children: <Widget>[
-      const ColoredBox(color: Nx2.deep),
-      Image.asset(_asset,
-          fit: BoxFit.cover,
-          alignment: Alignment.topCenter,
-          cacheWidth: cw,
-          gaplessPlayback: true,
-          errorBuilder: (_, __, ___) => const SizedBox.shrink()),
-      IgnorePointer(
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: <Color>[
-                Nx2.deep.withValues(alpha: dim * 0.6),
-                Nx2.deep.withValues(alpha: dim),
-                Nx2.deep.withValues(alpha: math.min(1, dim + 0.25)),
-              ],
-              stops: const <double>[0, 0.55, 1],
+    final int cw = (math.min(MediaQuery.sizeOf(context).width, 480) * 2).round();
+    return LuxeScene(
+      artOpacity: 0.32,
+      animatedDust: false,
+      child: Stack(fit: StackFit.expand, children: <Widget>[
+        if ((room || scene != null) && scene != Nx2Scene.hub)
+          Opacity(
+            opacity: 0.18,
+            child: Image.asset(_asset,
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
+                cacheWidth: cw,
+                gaplessPlayback: true,
+                errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+          ),
+        IgnorePointer(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: <Color>[
+                  Nx2.deep.withValues(alpha: dim * 0.38),
+                  Colors.transparent,
+                  Nx2.deep.withValues(alpha: math.min(0.6, dim)),
+                ],
+              ),
             ),
           ),
         ),
-      ),
-      if (child != null) child!,
-    ]);
+        if (child != null) child!,
+      ]),
+    );
   }
 }
 
@@ -155,7 +163,7 @@ class Nx2FramePainter extends CustomPainter {
                   const LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: <Color>[Color(0xE62A1466), Color(0xEB100830)],
+                    colors: <Color>[Color(0xEF242019), Luxe.panel],
                   ))
               .createShader(r));
     // inner sheen
@@ -205,7 +213,7 @@ class Nx2FramePainter extends CustomPainter {
       old.gems != gems;
 }
 
-/// Glass panel in the NX2 style (chamfered neon frame).
+/// Shared Station Luxe surface for cards, lobbies and lists.
 class Nx2Panel extends StatelessWidget {
   const Nx2Panel({
     super.key,
@@ -231,49 +239,30 @@ class Nx2Panel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Gradient border = borderColor != null
-        ? LinearGradient(colors: <Color>[
-            borderColor!,
-            Color.lerp(borderColor!, Nx2.magenta, 0.4) ?? borderColor!
-          ])
-        : (gold ? Nx2.goldGrad : Nx2.neon);
-    final Gradient? fill = tint == null
-        ? (gold
-            ? const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: <Color>[Color(0xE63A2410), Color(0xEB140A26)])
-            : null)
-        : LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: <Color>[
-              Color.alphaBlend(tint!, const Color(0xE62A1466)),
-              Color.alphaBlend(tint!, const Color(0xEB100830)),
-            ],
-          );
-    Widget body = CustomPaint(
-      painter: Nx2FramePainter(
-          cut: cut, fill: fill, border: border, glow: glow, gems: gems),
-      child: Padding(padding: padding, child: child),
+    final Widget body = LuxeSurface(
+      // Keep the old cut argument for call-site compatibility; translate it to
+      // the Home Page's rounded card geometry rather than chamfering corners.
+      radius: (cut + 12).clamp(16.0, 30.0),
+      padding: padding,
+      color: tint == null ? null : Color.alphaBlend(tint!, Luxe.panel),
+      borderColor: borderColor?.withValues(alpha: 0.55) ?? Luxe.line,
+      glow: glow,
+      child: child,
     );
-    if (onTap != null) {
-      body = _Pressable(onTap: onTap!, child: body);
-    }
-    return body;
+    return onTap == null ? body : _Pressable(onTap: onTap!, child: body);
   }
 }
 
 /// Scale-down-on-press with a light haptic.
-class _Pressable extends StatefulWidget {
+class _Pressable extends ConsumerStatefulWidget {
   const _Pressable({required this.onTap, required this.child});
   final VoidCallback onTap;
   final Widget child;
   @override
-  State<_Pressable> createState() => _PressableState();
+  ConsumerState<_Pressable> createState() => _PressableState();
 }
 
-class _PressableState extends State<_Pressable> {
+class _PressableState extends ConsumerState<_Pressable> {
   bool _down = false;
   @override
   Widget build(BuildContext context) {
@@ -283,7 +272,7 @@ class _PressableState extends State<_Pressable> {
       onTapCancel: () => setState(() => _down = false),
       onTapUp: (_) => setState(() => _down = false),
       onTap: () {
-        HapticFeedback.selectionClick();
+        if (ref.read(settingsProvider).haptics) HapticFeedback.selectionClick();
         NxSfx.instance.play('tick', gain: 0.6);
         widget.onTap();
       },
@@ -344,7 +333,7 @@ class Nx2Button extends StatelessWidget {
       );
 }
 
-/// Ornate title banner (winged violet plate) with centred text.
+/// Gold title plate shared by worlds, rooms and game selection.
 class Nx2Banner extends StatelessWidget {
   const Nx2Banner(
       {super.key, required this.text, this.height = 58, this.wings = false});
@@ -353,27 +342,23 @@ class Nx2Banner extends StatelessWidget {
   final bool wings;
 
   @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: height,
-      child: Stack(alignment: Alignment.center, children: <Widget>[
-        Positioned.fill(
-          child: Image.asset(
-              wings ? Nx2Assets.framesBannerWingsViolet : Nx2Assets.framesBannerViolet,
-              fit: BoxFit.fill,
-              cacheWidth: 700,
-              errorBuilder: (_, __, ___) => const SizedBox.shrink()),
-        ),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: height * 1.1),
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(text, style: Nx2.title.copyWith(fontSize: height * 0.3)),
+  Widget build(BuildContext context) => SizedBox(
+        height: height,
+        child: LuxeSurface(
+          radius: 18,
+          glow: wings ? 0.4 : 0,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(text,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: Nx2.title.copyWith(fontSize: height * 0.3)),
+            ),
           ),
         ),
-      ]),
-    );
-  }
+      );
 }
 
 /// Avatar inside the winged crystal ring.

@@ -10,6 +10,7 @@ import '../../../core/ui2/anix_kit.dart';
 import '../../../core/ui2/nx2_widgets.dart';
 import '../../../core/ui2/nx2_assets.dart';
 import '../../../core/widgets/nx_widgets.dart';
+import '../../../core/widgets/profile_preview.dart';
 import '../../../games/arcade_kit/arcade_meta.dart';
 import '../../../games/game_registry.dart';
 
@@ -236,6 +237,10 @@ class _LeaderboardPageState extends ConsumerState<LeaderboardPage> {
                                 padding: const EdgeInsets.only(bottom: 8),
                                 child: GlassPanel(
                                   blur: false,
+                                  onTap: isProfileUserId('${r['user_id'] ?? ''}')
+                                      ? () => showProfilePreview(context, '${r['user_id']}',
+                                          name: '${r['username'] ?? 'Pilot'}')
+                                      : null,
                                   tint: i == 0
                                       ? visual.accent.withValues(alpha: 0.07)
                                       : null,

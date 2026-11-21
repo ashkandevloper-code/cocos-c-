@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/profile/profile_service.dart';
 import '../../core/settings/app_settings.dart';
 import '../../core/theme/nx_theme.dart';
+import '../../core/ui2/luxe.dart';
 import '../../core/widgets/nx_widgets.dart';
 import 'models/nova_models.dart';
 import 'state/nova_controller.dart';
@@ -140,34 +141,6 @@ class _NovaGalleryPageState extends ConsumerState<NovaGalleryPage> {
     final NxThemeColors visual = NxThemeColors.of(context);
     final pal = WorldPalette.nova;
     final int unread = ctrl.unreadCount;
-    final List<String> sectionFa = <String>[
-      'گالری اجتماعی',
-      'اکتشاف',
-      'ریلز',
-      'اعلان‌ها',
-      'پروفایل'
-    ];
-    final List<String> sectionEn = <String>[
-      'Social gallery',
-      'Explore',
-      'Reels',
-      'Notifications',
-      'Profile'
-    ];
-    final List<String> subtitleFa = <String>[
-      'لحظه‌ها و داستان‌های کاوشگران را دنبال کن.',
-      'پست‌ها، هشتگ‌ها و آدم‌های تازه را پیدا کن.',
-      'پست‌های حرکتی را ورق بزن.',
-      'تازه‌ترین واکنش‌ها و خبرها.',
-      'گوشه‌ی شخصی تو در NOVA.',
-    ];
-    final List<String> subtitleEn = <String>[
-      'Follow moments and stories from explorers.',
-      'Find fresh posts, hashtags and people.',
-      'Browse motion posts.',
-      'Your latest reactions and updates.',
-      'Your own corner in NOVA.',
-    ];
     return NxWorldScaffold(
       title: 'NOVA GALLERY',
       palette: pal,
@@ -193,10 +166,10 @@ class _NovaGalleryPageState extends ConsumerState<NovaGalleryPage> {
                   : Icons.edit_rounded),
             ),
       bottomNavigationBar: NavigationBar(
-        backgroundColor: visual.surfaceRaised.withValues(alpha: 0.98),
-        indicatorColor: visual.accent.withValues(alpha: 0.22),
+        backgroundColor: Luxe.panel,
+        indicatorColor: Luxe.gold.withValues(alpha: 0.20),
         selectedIndex: _tab,
-        height: 66,
+        height: 60,
         labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
         onDestinationSelected: (int i) => setState(() => _tab = i),
         destinations: <Widget>[
@@ -223,48 +196,9 @@ class _NovaGalleryPageState extends ConsumerState<NovaGalleryPage> {
         ],
       ),
       body: Column(children: <Widget>[
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-              NxSpace.md, kToolbarHeight + NxSpace.xs, NxSpace.md, NxSpace.sm),
-          child: GlassPanel(
-            padding: const EdgeInsets.symmetric(
-                horizontal: NxSpace.md, vertical: NxSpace.sm),
-            radius: NxRadius.md,
-            child: Row(children: <Widget>[
-              Container(
-                width: 4,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: visual.accent,
-                  borderRadius: BorderRadius.circular(4),
-                  boxShadow: <BoxShadow>[
-                    BoxShadow(
-                        color: visual.accent.withValues(alpha: 0.48),
-                        blurRadius: 12)
-                  ],
-                ),
-              ),
-              const SizedBox(width: NxSpace.sm),
-              Expanded(
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(context.tx(sectionFa[_tab], sectionEn[_tab]),
-                          style: TextStyle(
-                              color: visual.text,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w900)),
-                      const SizedBox(height: 2),
-                      Text(context.tx(subtitleFa[_tab], subtitleEn[_tab]),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: visual.muted, fontSize: 12)),
-                    ]),
-              ),
-              Icon(Icons.auto_awesome_rounded, color: visual.accent, size: 20),
-            ]),
-          ),
-        ),
+        // The app bar and the selected tab already label this page. Don't
+        // repeat them in a large banner above the feed.
+        const SizedBox(height: kToolbarHeight),
         Expanded(
           child: AnimatedSwitcher(
             duration: reduced ? Duration.zero : NxMotion.normal,

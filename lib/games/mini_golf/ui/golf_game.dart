@@ -513,7 +513,7 @@ class _GolfGameState extends ArcadeLoopState<GolfGame> {
           _dragFrom = null;
           _dragTo = null;
         },
-        child: CustomPaint(painter: ArcadePainter(_paint, frame), size: Size.infinite),
+        child: flameCanvas(_paint),
       ),
       ValueListenableBuilder<int>(
         valueListenable: frame,

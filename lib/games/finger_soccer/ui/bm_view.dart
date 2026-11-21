@@ -16,6 +16,7 @@ import 'package:nexora/core/widgets/user_avatar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:nexora/games/core/game_contract.dart';
+import '../../arcade_kit/arcade_loop.dart';
 import '../core/bm_data.dart';
 import '../core/bm_engine.dart';
 import '../core/fs_custom_team.dart';
@@ -884,10 +885,20 @@ class _BermudaViewState extends State<BermudaView>
   /// Shown on the waiting screen after [kOnlineStallSeconds] (or a refused send): never a dead end.
   bool get _stalled => _setupSendFailed || _waitedSeconds >= kOnlineStallSeconds;
 
-  void _leaveStalled() {
+  Future<void> _leaveStalled() async {
     final NetLink? net = launch.net;
-    if (net != null) unawaited(net.send(<String, dynamic>{'a': 'leave', 'seat': mySeat}, kind: 'forfeit'));
-    _report(forfeit: true);
+    if (net == null) return;
+    final bool accepted = await net.forfeit();
+    if (_disposed || !mounted) return;
+    if (accepted) {
+      _report(forfeit: true, leftTeam: net.seatCount > 2);
+    } else {
+      _setupSendFailed = true;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(launch.tx('انصراف در سرور ثبت نشد؛ دوباره تلاش کن.',
+              'The server did not record the forfeit; please try again.'))));
+      setState(() {});
+    }
   }
 
   /// v4: the online team / formation screens (seats 0 and 1, before their setup is logged).
@@ -1024,13 +1035,21 @@ class _BermudaViewState extends State<BermudaView>
         e.restart(0);
         break;
       case 'leave':
-        if (isOnline && e.perSide > 1 && launch.net != null) {
-          // v5 team games: only this seat forfeits (logged, so every phone hands its turns to a teammate); the match
-          // goes on for the others and this player books a loss. When a whole side has left, the other side wins.
-          unawaited(launch.net!.send(<String, dynamic>{'a': 'leave', 'seat': mySeat}, kind: 'forfeit'));
-          _report(forfeit: true, leftTeam: true);
-        } else if (isOnline || bot) {
-          // flow.js: leaving counts as a loss
+        if (isOnline && launch.net != null) {
+          // nx_forfeit atomically validates the seat and appends the server log.
+          // Team games continue for the remaining players; a two-seat match
+          // settles immediately. Never report a confirmed withdrawal on a
+          // failed network write.
+          final bool accepted = await launch.net!.forfeit();
+          if (!mounted || _disposed) return;
+          if (accepted) {
+            _report(forfeit: true, leftTeam: e.perSide > 1);
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text(launch.tx('انصراف در سرور ثبت نشد؛ دوباره تلاش کن.',
+                    'The server did not record the forfeit; please try again.'))));
+          }
+        } else if (bot) {
           _report(forfeit: true);
         } else {
           // Already confirmed in the game bar: leave without the host's second confirmation.
@@ -1175,10 +1194,9 @@ class _BermudaViewState extends State<BermudaView>
               },
               onPointerUp: (_) => e.pointerUp(),
               onPointerCancel: (_) => e.pointerCancel(),
-              child: CustomPaint(
+              child: ArcadeFlameCanvas(
                 painter: BmPainter(e, im, view, () => _nowMs, dpr, fancy,
                     repaint: _frame),
-                size: Size.infinite,
               ),
             ),
           ),

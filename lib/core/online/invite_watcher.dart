@@ -10,16 +10,19 @@ import 'online_service.dart';
 
 /// Shows real-time game invitations from friends anywhere in the app.
 class InviteWatcher {
-  InviteWatcher(this._ref, this._messenger, this._open);
+  InviteWatcher(this._ref, this._messenger, this._open, this._openTalk);
 
   final WidgetRef _ref;
   final GlobalKey<ScaffoldMessengerState> _messenger;
 
-  /// Opens the online lobby for (gameId, code).
+  /// Opens the online lobby for (gameId, code) or a talk room by its UUID.
   final void Function(String gameId, String code) _open;
+  final void Function(String roomId) _openTalk;
 
   RealtimeChannel? _ch;
+  Timer? _poll;
   String? _uid;
+  bool _catchingUp = false;
   final Set<int> _seen = <int>{};
 
   void sync() {
@@ -28,6 +31,7 @@ class InviteWatcher {
     if (uid == _uid) return;
     _detach();
     _uid = uid;
+    _seen.clear();
     final SupabaseClient? c = o.games;
     if (uid == null || c == null) return;
     _ch = c
@@ -39,11 +43,22 @@ class InviteWatcher {
           filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'to_user', value: uid),
           callback: (PostgresChangePayload p) => _show(p.newRecord),
         )
-        .subscribe();
+        .subscribe((RealtimeSubscribeStatus status, Object? error) {
+          if (status == RealtimeSubscribeStatus.subscribed && _uid == uid) {
+            unawaited(_pending(c, uid));
+          }
+          if (error != null) debugPrint('invite realtime: $error (polling continues)');
+        });
     unawaited(_pending(c, uid));
+    // Realtime can be interrupted while the user stays on another page; a
+    // bounded pending-invite query preserves the invitation instead of
+    // silently losing it. The id set prevents repeat notifications.
+    _poll = Timer.periodic(const Duration(seconds: 15), (_) => unawaited(_pending(c, uid)));
   }
 
   Future<void> _pending(SupabaseClient c, String uid) async {
+    if (_uid != uid || _catchingUp) return;
+    _catchingUp = true;
     try {
       final List<dynamic> rows = await c
           .from('nx_invites')
@@ -52,25 +67,34 @@ class InviteWatcher {
           .eq('status', 'pending')
           .gte('created_at', DateTime.now().toUtc().subtract(const Duration(minutes: 10)).toIso8601String())
           .order('created_at', ascending: false)
-          .limit(1);
-      for (final dynamic r in rows) {
+          .limit(10);
+      if (_uid != uid) return;
+      for (final dynamic r in rows.reversed) {
         _show(Map<String, dynamic>.from(r as Map));
       }
-    } catch (_) {}
+    } catch (_) {
+      // The next poll or subscription recovery retries the read.
+    } finally {
+      _catchingUp = false;
+    }
   }
 
   void _show(Map<String, dynamic> r) {
     final int id = (r['id'] as num?)?.toInt() ?? -1;
-    if (!_seen.add(id)) return;
+    if (id < 0 || _uid == null || '${r['to_user']}' != _uid || _seen.contains(id)) return;
     final Map<String, dynamic> p = Map<String, dynamic>.from((r['payload'] as Map?) ?? const <String, dynamic>{});
+    final bool talk = r['kind'] == 'talk';
+    final String roomId = '${r['room_id'] ?? ''}';
     final String game = '${p['game'] ?? ''}';
     final String code = '${p['code'] ?? ''}';
     final String from = '${p['from_name'] ?? 'Pilot'}';
     final GameInfo? g = gameById(game);
     final bool fa = _ref.read(settingsProvider).isFa;
-    final String gameName = g == null ? game : (fa ? g.nameFa : g.nameEn);
+    final String gameName = talk ? '${p['title'] ?? (fa ? 'اتاق گفتگو' : 'Talk room')}'
+        : g == null ? game : (fa ? g.nameFa : g.nameEn);
     final ScaffoldMessengerState? m = _messenger.currentState;
-    if (m == null || code.isEmpty) return;
+    if (m == null || (talk ? roomId.isEmpty || roomId == 'null' : code.isEmpty)) return;
+    _seen.add(id);
     m.showSnackBar(SnackBar(
       duration: const Duration(seconds: 12),
       content: Text(fa ? '$from تو را به $gameName دعوت کرد' : '$from invited you to $gameName'),
@@ -81,13 +105,20 @@ class InviteWatcher {
           if (c != null && id >= 0) {
             unawaited(c.from('nx_invites').update(<String, dynamic>{'status': 'accepted'}).eq('id', id).then((_) {}, onError: (Object _) {}));
           }
-          _open(game, code);
+          if (talk) {
+            _openTalk(roomId);
+          } else {
+            _open(game, code);
+          }
         },
       ),
     ));
   }
 
   void _detach({bool disposing = false}) {
+    _poll?.cancel();
+    _poll = null;
+    _uid = null; // ignore in-flight reads/callbacks after a sign-out or dispose
     final RealtimeChannel? ch = _ch;
     _ch = null;
     if (ch == null) return;

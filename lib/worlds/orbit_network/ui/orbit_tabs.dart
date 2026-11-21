@@ -12,6 +12,7 @@ import '../models/orbit_models.dart';
 import '../state/orbit_controller.dart';
 import 'orbit_bubbles.dart';
 import '../../../core/online/social_api.dart';
+import '../../../core/widgets/profile_preview.dart';
 import '../data/supabase_orbit_repository.dart';
 import 'orbit_call_page.dart';
 import 'orbit_chat_page.dart';
@@ -657,6 +658,7 @@ class _OrbitFriendsPanelState extends ConsumerState<OrbitFriendsPanel> {
 
   Widget _userTile(NxUser u, {Widget? trailing}) => ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+        onTap: () => showProfilePreview(context, u.id, name: u.username, avatar: u.avatar),
         leading: Stack(children: <Widget>[
           CircleAvatar(
             backgroundColor: WorldPalette.orbit.primary.withValues(alpha: 0.25),

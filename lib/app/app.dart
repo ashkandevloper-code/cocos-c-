@@ -27,11 +27,13 @@ class NexoraApp extends ConsumerStatefulWidget {
 }
 
 class _NexoraAppState extends ConsumerState<NexoraApp> {
+  late final OnlineService _online;
   late final GoRouter _router = buildRouter(ref);
   final GlobalKey<ScaffoldMessengerState> _messenger =
       GlobalKey<ScaffoldMessengerState>();
   late final InviteWatcher _invites = InviteWatcher(ref, _messenger,
-      (String game, String code) => _router.push('/online/$game?code=$code'));
+      (String game, String code) => _router.push('/online/$game?code=$code'),
+      (String roomId) => _router.push('/room/$roomId'));
   late final TournamentWatcher _tournaments =
       TournamentWatcher(ref, _messenger, (String route) => _router.push(route));
   late final AnnouncementWatcher _announcements = AnnouncementWatcher(ref, _messenger);
@@ -47,19 +49,20 @@ class _NexoraAppState extends ConsumerState<NexoraApp> {
   @override
   void initState() {
     super.initState();
+    _online = ref.read(onlineProvider);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      ref.read(onlineProvider).addListener(_syncAuthMode);
+      _online.addListener(_syncAuthMode);
       _syncAuthMode();
       ref.read(cloudSyncProvider).start();
-      ref.read(onlineProvider).addListener(_invites.sync);
+      _online.addListener(_invites.sync);
       _invites.sync();
-      ref.read(onlineProvider).addListener(_calls.sync);
+      _online.addListener(_calls.sync);
       _calls.sync();
       _tournaments.start();
-      ref.read(onlineProvider).addListener(_tournaments.sync);
+      _online.addListener(_tournaments.sync);
       _tournaments.sync();
-      ref.read(onlineProvider).addListener(_announcements.sync);
+      _online.addListener(_announcements.sync);
       _announcements.sync();
       AppUpdater.instance.start();
     });
@@ -77,6 +80,11 @@ class _NexoraAppState extends ConsumerState<NexoraApp> {
 
   @override
   void dispose() {
+    _online.removeListener(_syncAuthMode);
+    _online.removeListener(_invites.sync);
+    _online.removeListener(_calls.sync);
+    _online.removeListener(_tournaments.sync);
+    _online.removeListener(_announcements.sync);
     _invites.dispose();
     _announcements.dispose();
     _calls.dispose();

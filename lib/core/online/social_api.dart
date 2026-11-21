@@ -15,10 +15,59 @@ class NxUser {
   static NxUser fromRow(Map<String, dynamic> r) => NxUser(
         id: '${r['id']}',
         username: '${r['username'] ?? 'Pilot'}',
-        avatar: r['avatar'] as String?,
+        avatar: (r['avatar_url'] as String?)?.isNotEmpty == true
+            ? r['avatar_url'] as String
+            : r['avatar'] as String?,
         level: (r['level'] as num?)?.toInt() ?? 1,
         onlineAt: DateTime.tryParse('${r['online_at'] ?? ''}'),
         bio: r['bio'] as String?,
+      );
+}
+
+/// The server's privacy-aware profile summary. In particular, a private
+/// account's follow *request* is not the same thing as a completed follow.
+class NxSocialProfile {
+  const NxSocialProfile({
+    required this.id,
+    required this.username,
+    required this.followers,
+    required this.following,
+    required this.posts,
+    required this.canView,
+    required this.isFollowing,
+    required this.isPending,
+    required this.isPrivate,
+    required this.isBlocked,
+    required this.isMe,
+    this.avatar,
+    this.bio = '',
+  });
+  final String id;
+  final String username;
+  final String? avatar;
+  final String bio;
+  final int followers;
+  final int following;
+  final int posts;
+  /// Server-authorized visibility of this user's private posts, not a guess
+  /// based on whether a follow RPC returned successfully.
+  final bool canView;
+  final bool isFollowing, isPending, isPrivate, isBlocked, isMe;
+
+  static NxSocialProfile fromRow(Map<String, dynamic> r) => NxSocialProfile(
+        id: '${r['id']}',
+        username: '${r['username'] ?? 'Pilot'}',
+        avatar: r['avatar_url'] as String?,
+        bio: '${r['bio'] ?? ''}',
+        followers: (r['followers'] as num?)?.toInt() ?? 0,
+        following: (r['following'] as num?)?.toInt() ?? 0,
+        posts: (r['posts'] as num?)?.toInt() ?? 0,
+        canView: r['can_view'] == true,
+        isFollowing: r['is_following'] == true,
+        isPending: r['is_pending'] == true,
+        isPrivate: r['is_private'] == true,
+        isBlocked: r['is_blocked'] == true,
+        isMe: r['is_me'] == true,
       );
 }
 
@@ -38,7 +87,21 @@ class SocialApi {
 
   String get me => c.auth.currentUser!.id;
 
-  static const String _cols = 'id, username, avatar, level, online_at, bio';
+  static const String _cols = 'id, username, avatar, avatar_url, level, online_at, bio';
+
+  /// Use the same server-side privacy/block/follow-request policy as NOVA.
+  /// Do not infer a completed follow from a successful RPC: private accounts
+  /// return is_pending=true until the owner accepts the request.
+  Future<NxSocialProfile> socialProfile(String id) async {
+    final dynamic r = await c.rpc('nx_social_profile', params: <String, dynamic>{'p_user': id});
+    return NxSocialProfile.fromRow(Map<String, dynamic>.from(r as Map));
+  }
+
+  Future<NxSocialProfile> setFollow(String id, bool on) async {
+    final dynamic r = await c.rpc('nx_social_toggle_follow',
+        params: <String, dynamic>{'p_target': id, 'p_follow': on});
+    return NxSocialProfile.fromRow(Map<String, dynamic>.from(r as Map));
+  }
 
   Future<List<NxUser>> friends() async {
     final List<dynamic> mine = await c.from('follows').select('followee').eq('follower', me);

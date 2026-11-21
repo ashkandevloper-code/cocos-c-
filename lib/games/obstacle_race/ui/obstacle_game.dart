@@ -455,7 +455,7 @@ class _ObstacleGameState extends ArcadeLoopState<ObstacleGame> {
           onPointerMove: (PointerMoveEvent e) => _touchX = e.localPosition.dx,
           onPointerUp: (_) => _touchX = null,
           onPointerCancel: (_) => _touchX = null,
-          child: CustomPaint(painter: ArcadePainter(_paint, frame), size: Size.infinite),
+          child: flameCanvas(_paint),
         ),
         ValueListenableBuilder<int>(
           valueListenable: frame,

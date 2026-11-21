@@ -40,7 +40,8 @@ class ArcadeTurnNet {
   /// Whose turn it is (lets the authority time out absent players).
   set turn(int? seat) => net.turnSeat = seat;
 
-  Future<bool> send(Map<String, dynamic> data, {int? asSeat}) => net.send(data, asSeat: asSeat);
+  Future<bool> send(Map<String, dynamic> data, {int? asSeat, String kind = 'move'}) =>
+      net.send(data, asSeat: asSeat, kind: kind);
 
   void dispose() => _inbox?.close();
 }

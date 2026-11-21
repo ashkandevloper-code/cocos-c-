@@ -67,15 +67,21 @@ class OrbitController extends ChangeNotifier {
     final OrbitRepository r = repo;
     if (r is SupabaseOrbitRepository) {
       r.listen(onChange: _onRemoteChange, onCall: (_) {});
+      // The publication only covers messages/membership/calls. A snapshot also
+      // catches missed events and retries queued messages after reconnect.
+      _poll = Timer.periodic(const Duration(seconds: 15), (_) {
+        if (!_disposed && _refreshes == 0) unawaited(refresh());
+      });
     }
-    refresh();
+    unawaited(refresh());
   }
 
   /// The server-backed repository when signed in (real members, calls), else null.
   SupabaseOrbitRepository? get online => repo is SupabaseOrbitRepository ? repo as SupabaseOrbitRepository : null;
   bool get isOnline => online != null;
 
-  Timer? _debounce;
+  Timer? _debounce, _poll;
+  int _refreshId = 0, _refreshes = 0;
   final Set<String> _dirty = <String>{};
 
   void _onRemoteChange(String chatId) {
@@ -86,9 +92,9 @@ class OrbitController extends ChangeNotifier {
       final List<String> open = _dirty.where(_messages.containsKey).toList();
       _dirty.clear();
       for (final String id in open) {
-        await repo.markRead(id);
+        try { await repo.markRead(id); } catch (e) { debugPrint('orbit read receipt: $e'); }
       }
-      await refresh();
+      if (!_disposed) await refresh();
     });
   }
 
@@ -127,6 +133,7 @@ class OrbitController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _debounce?.cancel();
+    _poll?.cancel();
     online?.stop();
     super.dispose();
   }
@@ -153,18 +160,34 @@ class OrbitController extends ChangeNotifier {
   }
 
   Future<void> refresh() async {
-    final chats = await repo.chats(ownerId: ownerId);
-    final out = <OrbitChatSummary>[];
-    for (final c in chats) {
-      out.add(OrbitChatSummary(c, await repo.lastMessage(c.id), await repo.unreadCount(c.id, ownerId)));
+    if (_disposed) return;
+    final int request = ++_refreshId;
+    _refreshes++;
+    try {
+      final List<OrbitChat> chats = await repo.chats(ownerId: ownerId);
+      final List<OrbitChatSummary> out = <OrbitChatSummary>[];
+      for (final OrbitChat c in chats) {
+        out.add(OrbitChatSummary(c, await repo.lastMessage(c.id), await repo.unreadCount(c.id, ownerId)));
+      }
+      final List<SharedItem> saved = inbox.read();
+      final Map<String, List<OrbitMessage>> open = <String, List<OrbitMessage>>{};
+      for (final String id in _messages.keys.toList()) {
+        open[id] = await repo.messages(id);
+      }
+      if (_disposed || request != _refreshId) return;
+      summaries = out;
+      inboxItems = saved;
+      for (final MapEntry<String, List<OrbitMessage>> e in open.entries) {
+        if (_messages.containsKey(e.key)) _messages[e.key] = e.value;
+      }
+      loading = false;
+      _notify();
+    } catch (e) {
+      debugPrint('orbit snapshot: $e');
+      if (!_disposed && request == _refreshId) { loading = false; _notify(); }
+    } finally {
+      _refreshes--;
     }
-    summaries = out;
-    inboxItems = inbox.read();
-    for (final id in _messages.keys.toList()) {
-      _messages[id] = await repo.messages(id);
-    }
-    loading = false;
-    _notify();
   }
 
   Future<void> openChat(String chatId) async {

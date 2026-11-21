@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../theme/nx_theme.dart';
+import 'luxe.dart';
 
 /// ANIX component kit: the owner's runtime art packs (buttons, toggles/checkboxes, modal + sheet
 /// panels, tooltips/popovers, navigation icons, game card shells, rank emblems, avatar set +
@@ -251,7 +252,9 @@ class _NinePainter extends CustomPainter {
 
 enum AnixButtonStyle { primary, secondary, ghost, destructive }
 
-/// Pack button (5 styles x 5 states x 2 sizes), 9-slice: the rounded end caps never stretch.
+/// Station Luxe button shared by app pages, game menus, rooms and dialogs.
+/// Styles remain source-compatible with the former painted-button API. The
+/// native gradients scale cleanly for long Persian labels and accessibility.
 class AnixButton extends StatefulWidget {
   const AnixButton({
     super.key,
@@ -279,75 +282,60 @@ class _AnixButtonState extends State<AnixButton> {
   bool _down = false;
   bool _focus = false;
 
-  String get _styleName => switch (widget.style) {
-        AnixButtonStyle.primary => 'primary',
-        AnixButtonStyle.secondary => 'secondary',
-        AnixButtonStyle.ghost => 'ghost',
-        AnixButtonStyle.destructive => 'destructive-neutral',
-      };
-
   @override
   Widget build(BuildContext context) {
     final bool enabled = widget.onTap != null && !widget.loading;
-    final bool large = widget.height >= 50;
-    final String size = large ? 'large' : 'compact';
-    // The pack's loading art bakes its spinner into the stretchable centre, so loading draws the
-    // normal art with a native spinner instead.
-    final String state = !enabled ? 'normal' : (_down ? 'pressed' : (_focus ? 'focused' : 'normal'));
-    final String asset = AnixAssets.button(widget.onTap == null && !widget.loading ? 'disabled' : _styleName, state, size);
-    // Canvas: large 320x96 (caps 48), compact 192x72 (caps 36).
-    final double canvasH = large ? 96 : 72;
-    final double cap = canvasH / 2;
-    final double canvasW = large ? 320 : 192;
-    final Rect slice = Rect.fromLTRB(cap, cap - 1, canvasW - cap, cap + 1);
-    final Color fg = switch (widget.style) {
-      AnixButtonStyle.ghost => const Color(0xFFBFF3FF),
-      _ => Colors.white,
+    final bool primary = widget.style == AnixButtonStyle.primary;
+    final bool danger = widget.style == AnixButtonStyle.destructive;
+    final Color foreground = primary ? Luxe.bg : (danger ? const Color(0xFFFFD9D9) : Luxe.ink);
+    final Gradient fill = switch (widget.style) {
+      AnixButtonStyle.primary => Luxe.goldGrad,
+      AnixButtonStyle.secondary => const LinearGradient(
+          colors: <Color>[Color(0xFF30291D), Luxe.panel]),
+      AnixButtonStyle.ghost => const LinearGradient(
+          colors: <Color>[Color(0x552A251B), Color(0x2214130F)]),
+      AnixButtonStyle.destructive => const LinearGradient(
+          colors: <Color>[Color(0xFF532932), Color(0xFF30181C)]),
     };
-    final List<BoxShadow> glow = enabled && widget.style == AnixButtonStyle.primary
-        ? <BoxShadow>[
-            BoxShadow(
-                color: const Color(0xFF2FD3FF).withValues(alpha: _down ? 0.25 : 0.38),
-                blurRadius: widget.height * 0.42,
-                spreadRadius: -widget.height * 0.12),
-          ]
-        : const <BoxShadow>[];
+    final Color border = danger
+        ? const Color(0x88FF5A7A)
+        : _focus ? Luxe.gold2 : Luxe.line;
     final Widget face = AnimatedScale(
       scale: _down ? 0.97 : 1,
-      duration: const Duration(milliseconds: 110),
-      child: Container(
-        height: widget.height,
-        constraints: BoxConstraints(minWidth: widget.height * (widget.loading ? 2.4 : 1.2)),
-        decoration: BoxDecoration(borderRadius: BorderRadius.circular(widget.height / 2), boxShadow: glow),
-        child: AnixNineSlice(
-          asset: asset,
-          center: slice,
-          scale: canvasH / widget.height,
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: widget.height * 0.34),
-            child: widget.loading
-            ? const SizedBox.shrink() // the loading art carries its own spinner
-            : Opacity(
-                opacity: enabled ? 1 : 0.55,
-                child: Row(mainAxisSize: MainAxisSize.min, mainAxisAlignment: MainAxisAlignment.center, children: <Widget>[
+      duration: const Duration(milliseconds: 160),
+      curve: Luxe.ease,
+      child: Opacity(
+        opacity: enabled || widget.loading ? 1 : 0.5,
+        child: Container(
+          height: widget.height,
+          constraints: BoxConstraints(minWidth: widget.height * (widget.loading ? 2.4 : 1.2)),
+          padding: EdgeInsets.symmetric(horizontal: widget.height * 0.33),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(widget.height / 2),
+            gradient: fill,
+            border: Border.all(color: border, width: _focus ? 1.5 : 1),
+            boxShadow: enabled && primary
+                ? <BoxShadow>[BoxShadow(
+                    color: Luxe.gold.withValues(alpha: _down ? 0.16 : 0.27),
+                    blurRadius: 24,
+                    spreadRadius: -6)]
+                : const <BoxShadow>[],
+          ),
+          child: widget.loading
+              ? Center(child: SizedBox(
+                  width: 22, height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: foreground)))
+              : Row(mainAxisSize: MainAxisSize.min, mainAxisAlignment: MainAxisAlignment.center, children: <Widget>[
                   if (widget.icon != null) ...<Widget>[
-                    Icon(widget.icon, color: fg, size: widget.fontSize + 4),
+                    Icon(widget.icon, color: foreground, size: widget.fontSize + 4),
                     const SizedBox(width: 8),
                   ],
-                  Flexible(
-                    child: Text(widget.label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                            color: fg,
-                            fontWeight: FontWeight.w900,
-                            fontSize: widget.fontSize,
-                            letterSpacing: 0.8,
-                            shadows: const <Shadow>[Shadow(color: Color(0x99000000), blurRadius: 6)])),
-                  ),
+                  Flexible(child: Text(widget.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: foreground, fontWeight: FontWeight.w800,
+                          fontSize: widget.fontSize, letterSpacing: 0.5))),
                 ]),
-              ),
-          ),
         ),
       ),
     );
@@ -360,7 +348,7 @@ class _AnixButtonState extends State<AnixButton> {
         onShowFocusHighlight: (bool v) => setState(() => _focus = v),
         actions: <Type, Action<Intent>>{
           ActivateIntent: CallbackAction<ActivateIntent>(onInvoke: (_) {
-            widget.onTap?.call();
+            if (enabled) widget.onTap?.call();
             return null;
           }),
         },
@@ -369,12 +357,9 @@ class _AnixButtonState extends State<AnixButton> {
           onTapDown: enabled ? (_) => setState(() => _down = true) : null,
           onTapCancel: enabled ? () => setState(() => _down = false) : null,
           onTapUp: enabled ? (_) => setState(() => _down = false) : null,
-          onTap: enabled
-              ? () {
-                  HapticFeedback.selectionClick();
-                  widget.onTap!();
-                }
-              : null,
+          // Audio/haptics are handled by the caller's settings-aware action,
+          // never forced by the shared button when the user disabled them.
+          onTap: enabled ? widget.onTap : null,
           child: face,
         ),
       ),
@@ -563,7 +548,8 @@ class AnixCheckboxTile extends StatelessWidget {
 
 enum AnixPanelSize { small, medium, fullscreen, sheet }
 
-/// Modal / panel family frame, 9-slice. Content is forced onto the dark ANIX theme so it reads on the art.
+/// All popups/sheets share the Home Page's rounded black/gold surface.
+/// Content uses the dark Station Luxe contrast even if a game has a light board.
 class AnixPanelFrame extends StatelessWidget {
   const AnixPanelFrame({
     super.key,
@@ -579,21 +565,18 @@ class AnixPanelFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (String name, double w, double h, double inset) = switch (size) {
-      AnixPanelSize.small => ('small', 320.0, 240.0, 36.0),
-      AnixPanelSize.medium => ('medium', 512.0, 384.0, 44.0),
-      AnixPanelSize.fullscreen => ('fullscreen', 768.0, 1024.0, 52.0),
-      AnixPanelSize.sheet => ('bottom-sheet', 768.0, 420.0, 52.0),
+    final double inset = switch (size) {
+      AnixPanelSize.small => 18,
+      AnixPanelSize.medium => 24,
+      AnixPanelSize.fullscreen => 28,
+      AnixPanelSize.sheet => 16,
     };
-    // Draw the art at 2x density so the frame rails stay thin on phones.
-    const double density = 2.0;
-    final Widget framed = AnixNineSlice(
-      asset: AnixAssets.modal(name, state),
-      center: Rect.fromLTRB(inset, inset, w - inset, h - inset),
-      scale: density,
-      child: Padding(padding: padding ?? EdgeInsets.all(inset / density + 6), child: child),
-    );
-    return anixDarkContent(context, framed);
+    return anixDarkContent(context, LuxeSurface(
+      radius: 26,
+      padding: padding ?? EdgeInsets.all(inset),
+      glow: state == 'active' ? 0.4 : 0.16,
+      child: child,
+    ));
   }
 }
 
@@ -604,7 +587,7 @@ Widget anixDarkContent(BuildContext context, Widget child) {
   return Theme(data: buildNxTheme(), child: child);
 }
 
-/// AlertDialog-compatible dialog drawn on the pack's medium panel.
+/// AlertDialog-compatible Station Luxe dialog shared by all screens.
 class AnixDialog extends StatelessWidget {
   const AnixDialog(
       {super.key, this.title, this.content, this.actions, this.icon, this.backgroundColor, this.shape});
@@ -636,7 +619,7 @@ class AnixDialog extends StatelessWidget {
             if (title != null)
               DefaultTextStyle.merge(
                 style: (t.textTheme.titleLarge ?? const TextStyle()).copyWith(
-                    fontWeight: FontWeight.w900, color: const Color(0xFFF4F0FF), fontSize: 19),
+                    fontWeight: FontWeight.w800, color: Luxe.ink, fontSize: 19),
                 child: title!,
               ),
             if (title != null && content != null) const SizedBox(height: 12),
@@ -644,7 +627,7 @@ class AnixDialog extends StatelessWidget {
               Flexible(
                 child: SingleChildScrollView(
                   child: DefaultTextStyle.merge(
-                    style: (t.textTheme.bodyMedium ?? const TextStyle()).copyWith(color: const Color(0xFFDCD6F2), height: 1.4),
+                    style: (t.textTheme.bodyMedium ?? const TextStyle()).copyWith(color: Luxe.ink, height: 1.4),
                     child: content!,
                   ),
                 ),

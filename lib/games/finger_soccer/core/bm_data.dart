@@ -208,6 +208,12 @@ const List<BmTeamDef> kBmTeamDefs = <BmTeamDef>[
   BmTeamDef('spt12', 'lux', 'NBA', 'teams/spt12', 10, 10),
   BmTeamDef('spt13', 'lux', 'Umbro', 'teams/spt13', 10, 10),
   BmTeamDef('barca_gold', 'lux', 'Barcelona Gold', 'discs/barcelona_gold', 10, 10),
+  // From the owner-supplied car-piece sheet (2026-11-21). Append rather than
+  // inserting into the old roster: saved team indices must retain their IDs.
+  BmTeamDef('car14', 'lux', 'Audi', 'teams/audi', 10, 10),
+  BmTeamDef('car15', 'lux', 'Volkswagen', 'teams/volkswagen', 10, 10),
+  BmTeamDef('car16', 'lux', 'Toyota', 'teams/toyota', 10, 10),
+  BmTeamDef('car17', 'lux', 'Nissan', 'teams/nissan', 10, 10),
 ];
 
 class BmTrail {

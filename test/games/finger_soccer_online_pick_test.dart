@@ -62,6 +62,12 @@ class _FakeNet implements NetLink {
   }
 
   @override
+  Future<bool> forfeit() async {
+    sent.add(<String, dynamic>{'a': 'leave', 'seat': seat});
+    return true;
+  }
+
+  @override
   void sendLive(String event, Map<String, dynamic> data) {}
   @override
   Stream<NetLiveMessage> get live => const Stream<NetLiveMessage>.empty();

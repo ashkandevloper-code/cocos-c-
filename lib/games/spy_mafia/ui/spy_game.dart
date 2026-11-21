@@ -94,6 +94,7 @@ class _SpyGameViewState extends ArcadeLoopState<SpyGameView> {
       g.leave((m.data['seat'] as num?)?.toInt() ?? m.seat);
     } else if (m.isTimeout) {
       if (g.phase == SpyPhase.clues) g.giveClue(g.turn, 0);
+      if (g.phase == SpyPhase.vote && m.data['a'] == 'vote') g.vote(m.seat, -1);
       if (g.phase == SpyPhase.guess) g.guess(-1);
     } else {
       final String a = '${m.data['a']}';
@@ -157,8 +158,10 @@ class _SpyGameViewState extends ArcadeLoopState<SpyGameView> {
       _phaseT = 0;
       for (final int s in g.activeSeats) {
         if (!g.votes.containsKey(s) && s != me) {
-          unawaited(t.send(<String, dynamic>{'a': 'vote', 'v': -1}, asSeat: s));
-          g.vote(s, -1);
+          unawaited(t.send(<String, dynamic>{'a': 'vote', 'v': -1},
+              asSeat: s, kind: 'timeout').then((bool accepted) {
+            if (accepted && mounted) setState(() { g.vote(s, -1); });
+          }));
         }
       }
     }
@@ -193,13 +196,13 @@ class _SpyGameViewState extends ArcadeLoopState<SpyGameView> {
   Widget build(BuildContext context) {
     final EdgeInsets pad = MediaQuery.paddingOf(context);
     return Stack(fit: StackFit.expand, children: <Widget>[
-      CustomPaint(painter: ArcadePainter((Canvas c, Size s) {
+      flameCanvas((Canvas c, Size s) {
         paintBackdrop(c, s, skin, time);
         // slow spotlight sweep
         final double x = s.width * (0.5 + 0.35 * math.sin(time * 0.4));
         paintGlow(c, Offset(x, s.height * 0.3), s.width * 0.6, skin.glow, 0.16);
         fx.paint(c);
-      }, frame)),
+      }),
       Positioned.fill(
         top: pad.top + 60,
         bottom: pad.bottom + 8,

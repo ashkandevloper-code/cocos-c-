@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/nova_models.dart';
@@ -17,6 +19,34 @@ class SupabaseNovaRepository implements NovaRepository {
   final SupabaseClient c;
   final LocalNovaRepository local;
   final String explorerId;
+  RealtimeChannel? _channel;
+
+  /// Low-latency updates for server-published tables. Likes, saves and story
+  /// views are *not* in the hosted Realtime publication, so the controller's
+  /// bounded snapshot poll remains necessary even with a live subscription.
+  void listen(void Function() onChange) {
+    stop();
+    final String uid = me;
+    _channel = c.channel('nxnova:$uid')
+      .onPostgresChanges(event: PostgresChangeEvent.all, schema: 'public',
+        table: 'nx_posts', callback: (_) => onChange())
+      .onPostgresChanges(event: PostgresChangeEvent.all, schema: 'public',
+        table: 'nx_post_comments', callback: (_) => onChange())
+      .onPostgresChanges(event: PostgresChangeEvent.all, schema: 'public',
+        table: 'nx_notifications',
+        filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'user_id', value: uid),
+        callback: (_) => onChange())
+      .subscribe((RealtimeSubscribeStatus status, Object? error) {
+        if (status == RealtimeSubscribeStatus.subscribed) onChange(); // catch up after reconnect
+        if (error != null) debugPrint('nova realtime: $error (snapshot poll continues)');
+      });
+  }
+
+  void stop() {
+    final RealtimeChannel? channel = _channel;
+    _channel = null;
+    if (channel != null) unawaited(c.removeChannel(channel));
+  }
 
   String get me => c.auth.currentUser!.id;
   String _out(String uid) => uid == me ? explorerId : uid;

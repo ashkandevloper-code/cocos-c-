@@ -618,7 +618,7 @@ class _KartGameState extends ArcadeLoopState<KartGame> {
       final KartLayout lay = KartLayout.compute(Size(c.maxWidth, c.maxHeight), _pad);
       Positioned at(Rect r, Widget child) => Positioned(left: r.left, top: r.top, width: r.width, height: r.height, child: child);
       return Stack(fit: StackFit.expand, children: <Widget>[
-        CustomPaint(painter: ArcadePainter(_paint, frame)),
+        flameCanvas(_paint),
         // HUD
         ValueListenableBuilder<int>(
           valueListenable: frame,

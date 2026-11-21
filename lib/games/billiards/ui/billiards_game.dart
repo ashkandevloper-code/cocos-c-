@@ -6,6 +6,7 @@ import 'package:flutter/scheduler.dart';
 
 import '../../../core/theme/nx_theme.dart';
 import '../../core/game_contract.dart';
+import '../../arcade_kit/arcade_loop.dart';
 import '../core/pool_bot.dart';
 import '../core/pool_config.dart';
 import '../core/pool_match.dart';
@@ -835,7 +836,7 @@ class _BilliardsGameState extends State<BilliardsGame>
                               painter: PoolTableFallbackPainter(accent: _theme.accent)),
                         ),
                         RepaintBoundary(
-                          child: CustomPaint(
+                          child: ArcadeFlameCanvas(
                             painter: PoolScenePainter(
                               _scene,
                               accent: _theme.accent,

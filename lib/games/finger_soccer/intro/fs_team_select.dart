@@ -177,6 +177,10 @@ class _FsTeamSelectState extends State<FsTeamSelect> {
   Future<void> _selectOrBuy() async {
     final BmTeam t = _t;
     if (_needsOwn && !GemShop.instance.ownsTeam(t.id)) {
+      if (!GemShop.instance.teamForSale(t.id)) {
+        _say(widget.fa ? 'این تیم هنوز در فروشگاه فعال نیست.' : 'This team is not yet available in the shop.');
+        return;
+      }
       final bool ok = await fsBuyTeam(context, t, widget.fa);
       if (!ok || !mounted) return;
     }
@@ -385,7 +389,9 @@ class _FsTeamSelectState extends State<FsTeamSelect> {
     final bool owned = !_needsOwn || GemShop.instance.ownsTeam(t.id);
     final bool picked = widget.teams[_side] == t.id;
     final Widget action = !owned
-        ? fsBuyButton('خرید', GemShop.instance.teamPrice(t.id), 130, 30)
+        ? (GemShop.instance.teamForSale(t.id)
+            ? fsBuyButton(widget.fa ? 'خرید' : 'Buy', GemShop.instance.teamPrice(t.id), 130, 30)
+            : fsGreyButton(widget.fa ? 'ناموجود' : 'Unavailable', 130, 30))
         : picked
             ? fsGreyButton('انتخاب شده', 130, 30)
             : fsLimeButton('انتخاب', 130, 30);

@@ -1,6 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/online/online_service.dart';
+import '../../core/online/social_api.dart';
+import '../../core/settings/app_settings.dart';
+import '../../core/widgets/profile_preview.dart';
+import '../../core/widgets/user_avatar.dart';
 import '../../core/theme/nx_theme.dart';
 import '../../games/game_registry.dart';
 import '../world_registry.dart';
@@ -109,26 +117,29 @@ class HubSearchDelegate extends SearchDelegate<void> {
   Widget _list(BuildContext context) {
     final hits = _filter();
     final visual = NxThemeColors.of(context);
-    if (hits.isEmpty) {
-      return Center(
-        child: TextButton.icon(
-          onPressed: () {
-            final q = query;
-            close(context, null);
-            context.push('/oracle?q=${Uri.encodeComponent(q)}');
-          },
-          icon: Icon(Icons.blur_circular_rounded, color: visual.accent),
-          label:
-              Text(isFa ? 'از ORACLE بپرس: «$query»' : 'Ask ORACLE: "$query"'),
-        ),
-      );
-    }
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-      itemCount: hits.length,
+      itemCount: hits.isEmpty ? 2 : hits.length + 1,
       separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (ctx, i) {
-        final h = hits[i];
+        if (i == 0) return _PeopleResults(query: query, onSelect: (NxUser user) {
+          // Keep the search route mounted beneath the sheet. Its item context
+          // has a Navigator and MediaQuery, and Back from a chat returns to
+          // the same people search instead of an unrelated page.
+          showProfilePreview(ctx, user.id, name: user.username, avatar: user.avatar);
+        });
+        if (hits.isEmpty) {
+          return TextButton.icon(
+            onPressed: () {
+              final String q = query;
+              close(context, null);
+              context.push('/oracle?q=${Uri.encodeComponent(q)}');
+            },
+            icon: Icon(Icons.blur_circular_rounded, color: visual.accent),
+            label: Text(isFa ? 'از ORACLE بپرس: «$query»' : 'Ask ORACLE: "$query"'),
+          );
+        }
+        final h = hits[i - 1];
         return Material(
           color: visual.surface,
           borderRadius: BorderRadius.circular(16),
@@ -153,6 +164,82 @@ class HubSearchDelegate extends SearchDelegate<void> {
         );
       },
     );
+  }
+}
+
+/// User results share the existing global search, so following someone is
+/// available from the Home Page and every world without another toolbar icon.
+/// The debounce and stale-query check prevent a slow response from replacing
+/// results for the latest query.
+class _PeopleResults extends ConsumerStatefulWidget {
+  const _PeopleResults({required this.query, required this.onSelect});
+  final String query;
+  final ValueChanged<NxUser> onSelect;
+
+  @override
+  ConsumerState<_PeopleResults> createState() => _PeopleResultsState();
+}
+
+class _PeopleResultsState extends ConsumerState<_PeopleResults> {
+  Timer? _debounce;
+  List<NxUser> _results = const <NxUser>[];
+  bool _loading = false;
+  int _request = 0;
+
+  @override
+  void initState() { super.initState(); _schedule(); }
+
+  @override
+  void didUpdateWidget(_PeopleResults oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.query != widget.query) _schedule();
+  }
+
+  void _schedule() {
+    _debounce?.cancel();
+    final int request = ++_request;
+    if (widget.query.trim().length < 2) {
+      _results = const <NxUser>[];
+      _loading = false;
+      return;
+    }
+    _loading = true;
+    _debounce = Timer(const Duration(milliseconds: 280), () async {
+      final c = ref.read(onlineProvider).client;
+      if (c?.auth.currentSession == null) {
+        if (mounted && request == _request) setState(() => _loading = false);
+        return;
+      }
+      try {
+        final List<NxUser> users = await SocialApi(c!).search(widget.query);
+        if (mounted && request == _request) setState(() { _results = users; _loading = false; });
+      } catch (_) {
+        if (mounted && request == _request) setState(() => _loading = false);
+      }
+    });
+  }
+
+  @override
+  void dispose() { _request++; _debounce?.cancel(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.query.trim().length < 2) return const SizedBox.shrink();
+    if (_loading) return const LinearProgressIndicator(minHeight: 2);
+    if (_results.isEmpty) return const SizedBox.shrink();
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: <Widget>[
+      Padding(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Text(context.tx('کاوشگران', 'People'),
+          style: const TextStyle(fontWeight: FontWeight.w800))),
+      for (final NxUser u in _results)
+        ListTile(
+          leading: NxUserAvatar(avatar: u.avatar, name: u.username),
+          title: Text(u.username),
+          subtitle: Text(context.tx('نمایش پروفایل · دنبال‌کردن · پیام',
+              'View profile · follow · message')),
+          onTap: () => widget.onSelect(u),
+        ),
+    ]);
   }
 }
 

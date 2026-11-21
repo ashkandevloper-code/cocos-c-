@@ -8,6 +8,7 @@ import '../../../core/profile/profile_service.dart';
 import '../../../core/settings/app_settings.dart';
 import '../../../core/theme/nx_theme.dart';
 import '../../../core/widgets/nx_widgets.dart';
+import '../../../core/widgets/profile_preview.dart';
 import '../../nova_gallery/models/art_asset.dart';
 import '../../nova_gallery/ui/nova_composer.dart' show showArtAssetPicker;
 import '../models/orbit_models.dart';
@@ -512,6 +513,7 @@ class _OrbitChatPageState extends ConsumerState<OrbitChatPage> {
                               title: Text(m.id == ctrl.ownerId
                                   ? '${m.name} (${fc.tx('تو', 'you')})'
                                   : m.name),
+                              onTap: () => showProfilePreview(fc, m.id, name: m.name),
                               subtitle: Text(m.role == 'owner'
                                   ? fc.tx('مالک', 'Owner')
                                   : (m.role == 'admin'

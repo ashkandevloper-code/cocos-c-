@@ -11,9 +11,11 @@ import '../../core/backend/supabase_backend.dart';
 import '../../core/online/online_config.dart';
 import '../../core/online/online_service.dart';
 import '../../core/online/room_voice.dart';
+import '../../core/online/social_api.dart';
 import '../../core/economy/gem_shop.dart';
 import '../../core/settings/app_settings.dart';
 import '../../core/ui2/anix_kit.dart';
+import '../../core/ui2/luxe.dart';
 import '../../core/ui2/nx2_widgets.dart';
 import '../../core/widgets/user_avatar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -22,7 +24,7 @@ import '../../games/finger_soccer/core/bm_data.dart';
 import '../../games/finger_soccer/core/bm_engine.dart';
 import '../../games/game_registry.dart';
 import '../arcade/online/online_match_page.dart';
-import '../nova_gallery/ui/nova_follow.dart';
+import '../../core/widgets/profile_preview.dart';
 
 /// A ROOM is a conversation first: a voice stage (LiveKit, unlimited speakers and listeners), a text chat and the
 /// member list. Its manager can pick a game, tick the players, and start; picked players choose their team and
@@ -35,20 +37,14 @@ class TalkRoomPage extends ConsumerStatefulWidget {
   ConsumerState<TalkRoomPage> createState() => _TalkRoomPageState();
 }
 
-/// Player limits per game inside a room (mirrors nx_game_bounds on the games project).
+/// ACTIVE match seats, not social room membership. Mirror nx_game_bounds in the
+/// games project; only Finger Soccer has a talk-room 1v1/2v2/3v3 format beyond
+/// its two-player quick lobby. A spectator never consumes one of these seats.
 class TalkRoomLimits {
-  static int maxPlayersFor(String game) => switch (game) {
-        'finger_soccer' || 'carrom' => 6,
-        'mafia' || 'spy_mafia' => 12,
-        'quiz' => 21,
-        _ => gameById(game)?.maxPlayers ?? 2,
-      };
+  static int maxPlayersFor(String game) =>
+      game == 'finger_soccer' ? 6 : gameById(game)?.maxPlayers ?? 0;
 
-  static int minPlayersFor(String game) => switch (game) {
-        'mafia' => 6,
-        'spy_mafia' => 3,
-        _ => 2,
-      };
+  static int minPlayersFor(String game) => gameById(game)?.minPlayers ?? 0;
 }
 
 /// v5 finger soccer (owner request 2026-11-20): the room manager swaps Team 1 and Team 2 before the match. Seats
@@ -83,19 +79,22 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
   /// Finger soccer: a picked player with no room team yet gets the team they last chose in the game's own setup.
   bool _fsTeamSeeded = false;
 
-  SupabaseClient? get _c => ref.read(onlineProvider).games;
-  String? get _me => ref.read(onlineProvider).uid;
+  // Cached while mounted: dispose() must not read a Riverpod ref.
+  late final OnlineService _online;
+  SupabaseClient? get _c => _online.games;
+  String? get _me => _online.uid;
 
   Map<String, dynamic>? _room;
   List<RoomMember> _members = <RoomMember>[];
   final Map<String, Map<String, dynamic>> _picked = <String, Map<String, dynamic>>{}; // user -> {seat, prefs}
+  List<Map<String, dynamic>> _bans = <Map<String, dynamic>>[];
   final List<RoomMessage> _messages = <RoomMessage>[];
   final TextEditingController _input = TextEditingController();
   final ScrollController _scroll = ScrollController();
   RealtimeChannel? _channel;
   Timer? _poll, _ping;
   String? _error;
-  bool _joined = false, _inMatch = false, _sending = false;
+  bool _joined = false, _inMatch = false, _sending = false, _leaving = false;
   String? _lastMatch;
   int _tab = 0; // 0 chat, 1 members, 2 games
 
@@ -117,6 +116,7 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
   @override
   void initState() {
     super.initState();
+    _online = ref.read(onlineProvider);
     WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(_enter()));
   }
 
@@ -135,20 +135,28 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
   }
 
   Future<void> _enter() async {
-    final OnlineService o = ref.read(onlineProvider);
-    if (!o.isOnline) await o.ensureSession();
+    if (!_online.isOnline) await _online.ensureSession();
+    if (!mounted) return;
     final SupabaseClient? c = _c;
-    if (c == null || o.uid == null) {
+    if (c == null || _online.uid == null) {
       setState(() => _error = 'offline');
       return;
     }
     try {
-      await o.gamesHello();
+      await _online.gamesHello();
       await c.rpc('nx_room_join', params: <String, dynamic>{'p_room': widget.roomId, 'p_role': 'speaker'});
+      if (!mounted) return;
       _joined = true;
       await Future.wait(<Future<void>>[_refresh(), _loadMessages()]);
+      if (!mounted || !_joined) return;
       _subscribe();
-      _poll = Timer.periodic(const Duration(seconds: 6), (_) => unawaited(_refresh()));
+      // Postgres Changes may be unavailable during reconnect; catch up both
+      // membership/ready state AND chat messages instead of losing chat until
+      // the next insert. Realtime still handles the low-latency path.
+      _poll = Timer.periodic(const Duration(seconds: 6), (_) {
+        unawaited(_refresh());
+        unawaited(_loadMessages());
+      });
       _ping = Timer.periodic(const Duration(seconds: 60),
           (_) => unawaited(c.rpc('nx_room_ping', params: <String, dynamic>{'p_room': widget.roomId}).then((_) {}, onError: (Object _) {})));
     } catch (e) {
@@ -167,16 +175,26 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
     _channel = c
         .channel('room-${widget.roomId}')
         .onPostgresChanges(
-          event: PostgresChangeEvent.insert,
+          event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'nx_room_messages',
           filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'room_id', value: widget.roomId),
-          callback: (PostgresChangePayload p) => _addMessage(p.newRecord),
+          callback: (PostgresChangePayload p) {
+            if (p.newRecord.isNotEmpty) _addMessage(p.newRecord);
+            // A DELETE has only an old record; polling reconciles it as well.
+          },
         )
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'nx_room_members',
+          filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'room_id', value: widget.roomId),
+          callback: (_) => unawaited(_refresh()),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'nx_room_game_players',
           filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'room_id', value: widget.roomId),
           callback: (_) => unawaited(_refresh()),
         )
@@ -187,16 +205,29 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
           filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'id', value: widget.roomId),
           callback: (_) => unawaited(_refresh()),
         )
-        .subscribe();
+        .subscribe((RealtimeSubscribeStatus status, Object? error) {
+          if (status == RealtimeSubscribeStatus.subscribed && mounted && _joined) {
+            unawaited(_refresh());
+            unawaited(_loadMessages());
+          }
+          if (error != null) debugPrint('talk room realtime: $error (polling continues)');
+        });
   }
 
   void _addMessage(Map<String, dynamic> r) {
     final String id = '${r['id']}';
-    if (r['deleted'] == true || _messages.any((RoomMessage m) => m.id == id)) return;
+    if (r['deleted'] == true) {
+      final int before = _messages.length;
+      _messages.removeWhere((RoomMessage m) => m.id == id);
+      if (before != _messages.length && mounted) setState(() {});
+      return;
+    }
+    if (_messages.any((RoomMessage m) => m.id == id)) return;
     if (_joined && '${r['author']}' != _me && _messages.isNotEmpty) NxSfx.instance.play('chat', gain: 0.7);
     _messages.add(RoomMessage(id, '${r['author']}', '${r['text']}',
         DateTime.tryParse('${r['created_at']}')?.toLocal() ?? DateTime.now()));
     _messages.sort((RoomMessage a, RoomMessage b) => a.at.compareTo(b.at));
+    if (_messages.length > 150) _messages.removeRange(0, _messages.length - 150);
     if (mounted) setState(() {});
     _toBottom();
   }
@@ -210,17 +241,26 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
     });
   }
 
+  bool _loadingMessages = false;
   Future<void> _loadMessages() async {
     final SupabaseClient? c = _c;
-    if (c == null) return;
-    final List<dynamic> rows = await c
-        .from('nx_room_messages')
-        .select('id, author, text, created_at, deleted')
-        .eq('room_id', widget.roomId)
-        .order('created_at', ascending: false)
-        .limit(100);
-    for (final dynamic r in rows.reversed) {
-      _addMessage(Map<String, dynamic>.from(r as Map));
+    if (c == null || !_joined || _loadingMessages) return;
+    _loadingMessages = true;
+    try {
+      final List<dynamic> rows = await c
+          .from('nx_room_messages')
+          .select('id, author, text, created_at, deleted')
+          .eq('room_id', widget.roomId)
+          .order('created_at', ascending: false)
+          .limit(100);
+      if (!mounted || !_joined) return;
+      for (final dynamic r in rows.reversed) {
+        _addMessage(Map<String, dynamic>.from(r as Map));
+      }
+    } catch (_) {
+      // Subscription and next poll can recover; do not tear down the room.
+    } finally {
+      _loadingMessages = false;
     }
   }
 
@@ -230,7 +270,7 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
     try {
       final Map<String, dynamic>? room = await c
           .from('nx_rooms')
-          .select('id, code, title, game, selected_game, status, match_id, host, settings, kind')
+          .select('id, code, title, game, selected_game, status, match_id, host, settings, kind, is_private')
           .eq('id', widget.roomId)
           .maybeSingle();
       final List<dynamic> mem = await c
@@ -244,10 +284,41 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
           .eq('room_id', widget.roomId)
           .order('seat');
       if (!mounted) return;
+      if (room == null || !mem.any((dynamic m) => '${(m as Map)['user_id']}' == _me)) {
+        // A real kick removes access. Stop subscriptions and voice rather than
+        // displaying stale messages after RLS has withdrawn membership.
+        _poll?.cancel();
+        _ping?.cancel();
+        final RealtimeChannel? channel = _channel;
+        _channel = null;
+        if (channel != null) unawaited(c.removeChannel(channel));
+        setState(() {
+          _joined = false;
+          _error = 'removed';
+          _room = null;
+          _members = <RoomMember>[];
+          _picked.clear();
+          _messages.clear();
+        });
+        unawaited(_leaveVoice());
+        return;
+      }
+      List<Map<String, dynamic>> bans = <Map<String, dynamic>>[];
+      if (mem.any((dynamic m) => '${(m as Map)['user_id']}' == _me && m['role'] == 'manager')) {
+        try {
+          final List<dynamic> rows = (await c.rpc('nx_room_bans_list',
+              params: <String, dynamic>{'p_room': widget.roomId})) as List<dynamic>;
+          bans = <Map<String, dynamic>>[
+            for (final dynamic row in rows) Map<String, dynamic>.from(row as Map),
+          ];
+        } catch (_) { /* RPC not yet deployed: do not invent a bans list. */ }
+      }
+      if (!mounted) return;
       final int before = _members.length;
       if (before > 0 && mem.length != before) NxSfx.instance.play(mem.length > before ? 'join' : 'leave', gain: 0.6);
       setState(() {
         _room = room;
+        _bans = bans;
         _members = mem.map((dynamic r) {
           final Map<String, dynamic> m = Map<String, dynamic>.from(r as Map);
           final dynamic p = m['profiles'];
@@ -415,12 +486,96 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
     }
   }
 
-  Future<void> _leave() async {
-    await _leaveVoice();
+  Future<void> _invite() async {
+    final SupabaseClient? c = _c;
+    if (!_isManager || c == null) return;
+    List<NxUser> friends = <NxUser>[];
     try {
-      await _c?.rpc('nx_room_leave', params: <String, dynamic>{'p_room': widget.roomId});
-    } catch (_) {}
-    if (mounted) Navigator.of(context).maybePop();
+      final SupabaseClient? main = ref.read(onlineProvider).client;
+      if (main != null) friends = await SocialApi(main).friends();
+    } catch (e) {
+      if (mounted) _snack(_clean(e));
+      return;
+    }
+    if (!mounted) return;
+    final Set<String> inRoom = _members.map((RoomMember m) => m.userId).toSet();
+    await showAnixSheet<void>(
+      context: context,
+      builder: (BuildContext ctx) => SafeArea(
+        child: SizedBox(
+          height: (MediaQuery.sizeOf(ctx).height * 0.55).clamp(200.0, 480.0),
+          child: friends.isEmpty
+              ? Center(child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Text(ctx.tx('دوستانت را از اوربیت اضافه کن تا بتوانی دعوتشان کنی.',
+                      'Add friends in Orbit Network before inviting them.'))))
+              : ListView(children: <Widget>[
+                  for (final NxUser f in friends)
+                    ListTile(
+                      leading: NxUserAvatar(avatar: f.avatar, name: f.username, size: 36),
+                      title: Text(f.username),
+                      trailing: inRoom.contains(f.id)
+                          ? const Icon(Icons.check_rounded, color: Nx2.success)
+                          : FilledButton(
+                              onPressed: () async {
+                                try {
+                                  await c.rpc('nx_room_invite', params: <String, dynamic>{
+                                    'p_room': widget.roomId, 'p_user': f.id,
+                                  });
+                                  if (ctx.mounted) Navigator.pop(ctx);
+                                  if (mounted) _snack(context.tx('دعوت فرستاده شد.', 'Invite sent.'));
+                                } catch (e) {
+                                  if (mounted) _snack(_clean(e));
+                                }
+                              },
+                              child: Text(ctx.tx('دعوت', 'Invite')),
+                            ),
+                    ),
+                ]),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _kick(RoomMember member) async {
+    if (!_isManager || member.userId == _me) return;
+    final bool? ok = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext ctx) => AnixDialog(
+        title: Text(ctx.tx('حذف از اتاق', 'Remove from room')),
+        content: Text(ctx.tx('حذف ${member.name} ورود دوباره را تا زمان رفع مسدودی ممنوع می‌کند. بازیکن فعال را تا پایان مسابقه نمی‌توان حذف کرد.',
+            'Remove ${member.name}? They cannot rejoin until unblocked. Active match players stay until the match ends.')),
+        actions: <Widget>[
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(ctx.tx('انصراف', 'Cancel'))),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(ctx.tx('حذف', 'Remove'))),
+        ],
+      ),
+    );
+    if (ok == true && mounted) {
+      await _rpc('nx_room_kick', <String, dynamic>{'p_room': widget.roomId, 'p_user': member.userId});
+    }
+  }
+
+  Future<void> _leave() async {
+    if (_leaving) return;
+    if (!_joined) {
+      if (mounted) Navigator.of(context).pop();
+      return;
+    }
+    _leaving = true;
+    try {
+      final SupabaseClient? c = _c;
+      if (c == null) throw StateError('offline');
+      await c.rpc('nx_room_leave', params: <String, dynamic>{'p_room': widget.roomId});
+      if (!mounted) return;
+      await _leaveVoice();
+      if (mounted) Navigator.of(context).pop();
+    } catch (e) {
+      // A failed write must not pretend the manager role/seat was relinquished.
+      if (mounted) _snack(_clean(e));
+    } finally {
+      _leaving = false;
+    }
   }
 
   // ------------------------------------------------------------------ UI
@@ -428,13 +583,9 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
   Widget build(BuildContext context) {
     final String title = '${_room?['title'] ?? context.tx('اتاق', 'Room')}';
     return PopScope(
-      canPop: true,
+      canPop: false,
       onPopInvokedWithResult: (bool didPop, Object? _) {
-        if (didPop) {
-          final lk.Room? v = _voice;
-          _voice = null;
-          if (v != null) unawaited(v.disconnect().then((_) => v.dispose()));
-        }
+        if (!didPop) unawaited(_leave());
       },
       child: Scaffold(
         backgroundColor: Nx2.deep,
@@ -448,6 +599,12 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
                   style: const TextStyle(fontSize: 11, color: Nx2.muted)),
           ]),
           actions: <Widget>[
+            if (_isManager)
+              IconButton(
+                tooltip: context.tx('دعوت دوستان', 'Invite friends'),
+                icon: const Icon(Icons.person_add_alt_1_rounded),
+                onPressed: _invite,
+              ),
             IconButton(
               tooltip: context.tx('خروج از اتاق', 'Leave room'),
               icon: const Icon(Icons.logout_rounded),
@@ -455,13 +612,9 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
             ),
           ],
         ),
-        body: Container(
-          decoration: const BoxDecoration(
-            image: DecorationImage(
-                image: AssetImage(AnixAssets.sceneVoiceStage),
-                fit: BoxFit.cover,
-                colorFilter: ColorFilter.mode(Color(0xB307031A), BlendMode.darken)),
-          ),
+        body: Nx2Background(
+          room: true,
+          scene: Nx2Scene.voiceStage,
           child: _error != null
               ? _errorView()
               : _room == null
@@ -491,7 +644,9 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
             Text(
                 _error == 'offline'
                     ? context.tx('برای اتاق‌ها باید وارد حساب شوی.', 'Sign in to use rooms.')
-                    : _error!,
+                    : _error == 'removed'
+                        ? context.tx('دیگر به این اتاق دسترسی نداری.', 'You no longer have access to this room.')
+                        : _error!,
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: Nx2.text)),
           ]),
@@ -563,7 +718,9 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
             itemBuilder: (_, int i) {
               final RoomMember m = stage[i];
               final bool talking = _speaking(m.userId);
-              return SizedBox(
+              return GestureDetector(
+                onTap: () => _showMember(m),
+                child: SizedBox(
                 width: 56,
                 child: Column(children: <Widget>[
                   Stack(clipBehavior: Clip.none, children: <Widget>[
@@ -582,6 +739,7 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(color: Nx2.text, fontSize: 10, fontWeight: FontWeight.w700)),
                 ]),
+                ),
               );
             },
           ),
@@ -659,7 +817,13 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
                     mainAxisAlignment: mine ? MainAxisAlignment.end : MainAxisAlignment.start,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: <Widget>[
-                      if (!mine) ...<Widget>[NxUserAvatar(avatar: who?.avatar, name: name, size: 26), const SizedBox(width: 6)],
+                      if (!mine) ...<Widget>[
+                        GestureDetector(
+                          onTap: who == null ? null : () => _showMember(who),
+                          child: NxUserAvatar(avatar: who?.avatar, name: name, size: 26),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
                       bubble,
                     ],
                   );
@@ -706,6 +870,15 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 16),
       children: <Widget>[
+        if (_isManager)
+          SwitchListTile(
+            title: Text(context.tx('ورود فقط با دعوت', 'Invite-only admission')),
+            subtitle: Text(context.tx('مخاطب‌ها جدا از صندلی‌های فعال بازی‌اند.',
+                'Listeners and spectators do not consume active game seats.')),
+            value: _room?['is_private'] == true,
+            onChanged: (bool v) => unawaited(_rpc('nx_room_set_access',
+                <String, dynamic>{'p_room': widget.roomId, 'p_private': v})),
+          ),
         for (final RoomMember m in _members)
           ListTile(
             dense: true,
@@ -734,6 +907,8 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
                         case 'mute':
                           unawaited(_rpc('nx_room_set_muted',
                               <String, dynamic>{'p_room': widget.roomId, 'p_user': m.userId, 'p_muted': !m.muted}));
+                        case 'kick':
+                          unawaited(_kick(m));
                       }
                     },
                     itemBuilder: (_) => <PopupMenuEntry<String>>[
@@ -743,65 +918,62 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
                         PopupMenuItem<String>(value: 'spectator', child: Text(context.tx('شنونده کن', 'Make listener'))),
                       PopupMenuItem<String>(
                           value: 'mute', child: Text(m.muted ? context.tx('باصدا کن', 'Unmute') : context.tx('بی‌صدا کن', 'Mute'))),
+                      PopupMenuItem<String>(value: 'kick', child: Text(context.tx('حذف و مسدود کردن', 'Remove and block'))),
                     ],
                   )
                 : null,
           ),
+        if (_isManager && _bans.isNotEmpty) ...<Widget>[
+          const Divider(color: Luxe.line),
+          Text(context.tx('مسدودشده‌های این اتاق', 'Blocked in this room'),
+              style: const TextStyle(color: Nx2.gold, fontWeight: FontWeight.w800)),
+          for (final Map<String, dynamic> banned in _bans)
+            ListTile(
+              title: Text('${banned['username'] ?? banned['user_id']}',
+                  style: const TextStyle(color: Nx2.text)),
+              trailing: TextButton(
+                onPressed: () => unawaited(_rpc('nx_room_unban',
+                    <String, dynamic>{'p_room': widget.roomId, 'p_user': banned['user_id']})),
+                child: Text(context.tx('رفع مسدودی', 'Unblock')),
+              ),
+            ),
+        ],
       ],
     );
   }
 
-  /// Member card: big avatar, name, follower / following counts and a follow button (shared follows table).
-  void _showMember(RoomMember m) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Nx2.night,
-      builder: (BuildContext ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
-          child: Column(mainAxisSize: MainAxisSize.min, children: <Widget>[
-            NxUserAvatar(avatar: m.avatar, name: m.name, size: 84, ring: m.isManager ? Nx2.gold : Nx2.violet),
-            const SizedBox(height: 8),
-            Text(m.name, style: const TextStyle(color: Nx2.text, fontSize: 18, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 12),
-            NovaFollowBar(uid: m.userId, self: m.userId == _me),
-            if (m.userId != _me)
-              TextButton.icon(
-                onPressed: () async {
-                  Navigator.pop(ctx);
-                  final TextEditingController t = TextEditingController();
-                  final bool? ok = await showDialog<bool>(
-                    context: context,
-                    builder: (BuildContext d) => AlertDialog(
-                      title: Text(context.tx('گزارش ${m.name}', 'Report ${m.name}')),
-                      content: TextField(controller: t, maxLength: 300,
-                          decoration: InputDecoration(hintText: context.tx('چه اتفاقی افتاد؟', 'What happened?'))),
-                      actions: <Widget>[
-                        TextButton(onPressed: () => Navigator.pop(d, false), child: Text(context.tx('انصراف', 'Cancel'))),
-                        FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(context.tx('ارسال', 'Send'))),
-                      ],
-                    ),
-                  );
-                  if (ok == true && t.text.trim().length >= 2) {
-                    try {
-                      await ref.read(onlineProvider).rpc('nx_report_user', <String, dynamic>{
-                        'p_target': m.userId, 'p_kind': 'room', 'p_target_id': widget.roomId, 'p_reason': t.text.trim(),
-                      });
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                            content: Text(context.tx('گزارش برای مدیران فرستاده شد', 'Report sent to the admins'))));
-                      }
-                    } catch (_) {}
-                  }
-                  t.dispose();
-                },
-                icon: const Icon(Icons.flag_rounded, color: Nx2.muted, size: 18),
-                label: Text(context.tx('گزارش تخلف', 'Report'), style: const TextStyle(color: Nx2.muted)),
-              ),
-          ]),
+  /// The same follow/message preview used by NOVA, Orbit and online matches.
+  void _showMember(RoomMember m) => unawaited(showProfilePreview(context, m.userId,
+      name: m.name, avatar: m.avatar,
+      onReport: m.userId == _me ? null : () => _reportMember(m)));
+
+  Future<void> _reportMember(RoomMember m) async {
+    final TextEditingController text = TextEditingController();
+    try {
+      final bool? ok = await showDialog<bool>(
+        context: context,
+        builder: (BuildContext d) => AnixDialog(
+          title: Text(d.tx('گزارش ${m.name}', 'Report ${m.name}')),
+          content: TextField(controller: text, maxLength: 300,
+              decoration: InputDecoration(hintText: d.tx('چه اتفاقی افتاد؟', 'What happened?'))),
+          actions: <Widget>[
+            TextButton(onPressed: () => Navigator.pop(d, false), child: Text(d.tx('انصراف', 'Cancel'))),
+            FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(d.tx('ارسال', 'Send'))),
+          ],
         ),
-      ),
-    );
+      );
+      if (ok != true || !mounted || text.text.trim().length < 2) return;
+      await ref.read(onlineProvider).rpc('nx_report_user', <String, dynamic>{
+        'p_target': m.userId, 'p_kind': 'room', 'p_target_id': widget.roomId, 'p_reason': text.text.trim(),
+      });
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(context.tx('گزارش برای مدیران فرستاده شد', 'Report sent to the admins'))));
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(context.tx('ارسال گزارش ممکن نشد', 'Could not send the report'))));
+    } finally {
+      text.dispose();
+    }
   }
 
   // ------------------------------------------------------------------ games
@@ -860,7 +1032,7 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
             CheckboxListTile(
               dense: true,
               value: _picked.containsKey(m.userId),
-              onChanged: !_isManager
+              onChanged: !_isManager || !m.onStage
                   ? null
                   : (bool? on) {
                       final List<String> ids = <String>[
@@ -884,7 +1056,10 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
               title: Text(m.name, style: const TextStyle(color: Nx2.text, fontWeight: FontWeight.w700)),
               subtitle: _picked.containsKey(m.userId)
                   ? Text(_seatLabel(_picked[m.userId]!), style: const TextStyle(color: Nx2.cyan, fontSize: 11))
-                  : null,
+                  : !m.onStage
+                      ? Text(context.tx('برای انتخاب، ابتدا سخنران شود.', 'Promote to speaker before selecting.'),
+                          style: const TextStyle(color: Nx2.muted, fontSize: 11))
+                      : null,
             ),
           if (_isManager && _game == 'finger_soccer' && _picked.length >= 2)
             Align(

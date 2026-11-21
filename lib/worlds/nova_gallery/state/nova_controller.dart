@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -25,13 +27,31 @@ final novaControllerProvider = ChangeNotifierProvider<NovaController>((ref) => N
 /// In-memory view state of NOVA GALLERY, kept in sync with the repository.
 class NovaController extends ChangeNotifier {
   NovaController(this.repo) {
-    refresh();
+    final SupabaseNovaRepository? remote = online;
+    if (remote != null) {
+      remote.listen(_onRemoteChange);
+      // RLS-limited Realtime tables don't include likes, saves or story views;
+      // periodic snapshots also recover a missed event after network loss.
+      _poll = Timer.periodic(const Duration(seconds: 20), (_) {
+        if (_refreshFlight == null) unawaited(refresh());
+      });
+    }
+    unawaited(refresh());
   }
 
   final NovaRepository repo;
   SupabaseNovaRepository? get online => repo is SupabaseNovaRepository ? repo as SupabaseNovaRepository : null;
+  Timer? _poll, _debounce;
+  Future<void>? _refreshFlight;
+  bool _refreshAgain = false;
   bool loading = true;
   bool _disposed = false;
+
+  void _onRemoteChange() {
+    if (_disposed) return;
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 250), () => unawaited(refresh()));
+  }
   List<NovaPost> posts = <NovaPost>[];
   Set<String> saved = <String>{};
   List<NovaStory> stories = <NovaStory>[];
@@ -54,6 +74,9 @@ class NovaController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _poll?.cancel();
+    _debounce?.cancel();
+    online?.stop();
     super.dispose();
   }
 
@@ -61,19 +84,50 @@ class NovaController extends ChangeNotifier {
     if (!_disposed) notifyListeners();
   }
 
-  Future<void> refresh() async {
-    final f = await repo.feed();
-    final s = await repo.savedIds();
-    final st = await repo.activeStories();
-    final n = await repo.notifications();
-    final t = await repo.trendingHashtags();
-    posts = f;
-    saved = s;
-    stories = st;
-    notifications = n;
-    trending = t;
-    loading = false;
-    _notify();
+  Future<void> refresh() {
+    if (_disposed) return Future<void>.value();
+    final Future<void>? running = _refreshFlight;
+    if (running != null) {
+      // One additional read after an in-flight snapshot, not one for every
+      // Realtime row. Manual writes await it before updating their own UI.
+      _refreshAgain = true;
+      return running;
+    }
+    final Completer<void> done = Completer<void>();
+    _refreshFlight = done.future;
+    unawaited(_runRefresh(done));
+    return done.future;
+  }
+
+  Future<void> _runRefresh(Completer<void> done) async {
+    try {
+      do {
+        _refreshAgain = false;
+        try {
+          final List<NovaPost> f = await repo.feed();
+          final Set<String> s = await repo.savedIds();
+          final List<NovaStory> st = await repo.activeStories();
+          final List<NovaNotification> n = await repo.notifications();
+          final List<MapEntry<String, int>> t = await repo.trendingHashtags();
+          if (_disposed) break;
+          posts = f;
+          saved = s;
+          stories = st;
+          notifications = n;
+          trending = t;
+          loading = false;
+          _notify();
+        } catch (e) {
+          // Keep the last server snapshot on transient failures. Realtime or
+          // the next bounded poll retries without stranding the loading UI.
+          debugPrint('nova snapshot: $e');
+          if (!_disposed) { loading = false; _notify(); }
+        }
+      } while (_refreshAgain && !_disposed);
+    } finally {
+      _refreshFlight = null;
+      done.complete();
+    }
   }
 
   Future<NovaPost> createPost({

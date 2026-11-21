@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/storage/local_store.dart';
@@ -184,7 +185,12 @@ class SupabaseOrbitRepository implements OrbitRepository {
             if ('${p.newRecord['caller']}' != me) onCall(p.newRecord);
           },
         )
-        .subscribe();
+        .subscribe((RealtimeSubscribeStatus status, Object? error) {
+          // A successful reconnect can have missed multiple messages or
+          // membership changes. Refresh the inbox and all open chats.
+          if (status == RealtimeSubscribeStatus.subscribed) onChange('');
+          if (error != null) debugPrint('orbit realtime: $error (snapshot poll continues)');
+        });
   }
 
   void stop() {

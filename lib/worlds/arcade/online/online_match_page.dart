@@ -10,6 +10,7 @@ import '../../../core/online/cloud_profile_sync.dart';
 import '../../../core/online/match_link.dart';
 import '../../../core/online/online_service.dart';
 import '../../../core/online/room_voice.dart';
+import '../../../core/widgets/profile_preview.dart';
 import '../../../core/profile/profile_service.dart';
 import '../../../core/settings/app_settings.dart';
 import '../../../core/theme/nx_theme.dart';
@@ -44,6 +45,7 @@ class _OnlineMatchPageState extends ConsumerState<OnlineMatchPage>
   String? _error;
   int _generation = 0;
   bool _finished = false;
+  bool _withdrawn = false;
   bool _reporting = false;
   GameResult? _localResult;
   GameResult? _result;
@@ -134,6 +136,7 @@ class _OnlineMatchPageState extends ConsumerState<OnlineMatchPage>
   void _onGameFinish(GameResult r) {
     if (_finished) return;
     _finished = true;
+    _withdrawn = !r.endsMatch; // self-forfeit while teammates keep playing
     _localResult = r;
     final SupabaseMatchLink? l = _link;
     if (l != null && r.endsMatch) unawaited(_submitResult(l, r));
@@ -252,9 +255,16 @@ class _OnlineMatchPageState extends ConsumerState<OnlineMatchPage>
       ),
     );
     if (ok == true) {
-      _finished = true;
-      await _link?.forfeit();
-      return true;
+      final bool accepted = await _link?.forfeit() ?? false;
+      if (accepted) {
+        _finished = true;
+        return true;
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(context.tx('سرور انصراف را تأیید نکرد. پس از اتصال دوباره تلاش کن.',
+                'The server did not confirm the forfeit. Reconnect and try again.'))));
+      }
     }
     return false;
   }
@@ -362,46 +372,72 @@ class _OnlineMatchPageState extends ConsumerState<OnlineMatchPage>
   }
 
   Widget _presenceBar(SupabaseMatchLink l) {
-    return IgnorePointer(
-      child: Row(mainAxisSize: MainAxisSize.min, children: <Widget>[
-        for (int s = 0; s < l.seatCount; s++)
-          Padding(
-            padding: const EdgeInsets.only(left: 3),
-            child: Container(
-              width: 9,
-              height: 9,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: l.forfeitedSeats.contains(s)
-                    ? NxColors.danger
-                    : (l.connectedSeats.contains(s)
-                        ? NxColors.success
-                        : NxColors.gold),
-                border: s == l.mySeat
-                    ? Border.all(color: Colors.white, width: 1.5)
-                    : null,
+    return Material(
+      color: Colors.black.withValues(alpha: 0.55),
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () => showAnixSheet<void>(context: context, builder: (BuildContext sheet) =>
+          SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: <Widget>[
+            Text(sheet.tx('بازیکنان', 'Players'), style: const TextStyle(fontWeight: FontWeight.w800)),
+            for (int s = 0; s < l.seatCount; s++)
+              ListTile(
+                leading: Icon(Icons.circle, size: 13, color: l.forfeitedSeats.contains(s)
+                    ? NxColors.danger : l.connectedSeats.contains(s) ? NxColors.success : NxColors.gold),
+                title: Text(l.names[s]),
+                subtitle: Text(l.realtimePresenceReady
+                    ? sheet.tx('جایگاه ${s + 1}', 'Seat ${s + 1}')
+                    : sheet.tx('حضور در حال بازیابی · حرکت‌ها همگام می‌شوند',
+                        'Presence reconnecting · moves still sync')),
+                onTap: () => showProfilePreview(sheet, l.playerIds[s], name: l.names[s]),
               ),
-            ),
-          ),
-      ]),
+          ]))),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          child: Row(mainAxisSize: MainAxisSize.min, children: <Widget>[
+            Icon(l.realtimePresenceReady ? Icons.people_outline_rounded : Icons.sync_problem_rounded,
+                size: 17, color: l.realtimePresenceReady ? Colors.white : NxColors.gold),
+            const SizedBox(width: 5),
+            for (int s = 0; s < l.seatCount; s++)
+              Padding(
+                padding: const EdgeInsets.only(left: 3),
+                child: Container(
+                  width: 9,
+                  height: 9,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: l.forfeitedSeats.contains(s)
+                        ? NxColors.danger
+                        : l.connectedSeats.contains(s) ? NxColors.success : NxColors.gold,
+                    border: s == l.mySeat ? Border.all(color: Colors.white, width: 1.5) : null,
+                  ),
+                ),
+              ),
+          ]),
+        ),
+      ),
     );
   }
 
   Widget _overlay(BuildContext context, GameResult r) {
     final MatchEnd? end = _serverEnd;
-    final bool settled = end?.rewardsGranted ?? false;
-    final (String title, Color color, IconData icon) = end == null
-        ? (context.tx('در انتظار تأیید نتیجه', 'Waiting for match settlement'), NxColors.turquoise, Icons.hourglass_top_rounded)
-        : !settled
-            ? (end.status == 'disputed'
-                ? context.tx('نتیجه مورد اختلاف است', 'Result disputed')
-                : context.tx('مسابقه بدون نتیجه بسته شد', 'Match closed without a result'),
-                NxColors.danger, Icons.report_problem_rounded)
-            : switch (r.outcome) {
-                GameOutcome.win => (context.tx('پیروزی!', 'Victory!'), NxColors.gold, Icons.emoji_events_rounded),
-                GameOutcome.draw => (context.tx('مساوی', 'Draw'), NxColors.turquoise, Icons.handshake_rounded),
-                GameOutcome.loss => (context.tx('شکست', 'Defeat'), NxColors.danger, Icons.sentiment_dissatisfied_rounded),
-              };
+    final MatchSettlementView view = matchSettlementView(end, withdrawalRequested: _withdrawn);
+    final bool settled = view == MatchSettlementView.settled;
+    final (String title, Color color, IconData icon) = switch (view) {
+      MatchSettlementView.waiting =>
+        (context.tx('در انتظار تأیید نتیجه', 'Waiting for match settlement'), NxColors.turquoise, Icons.hourglass_top_rounded),
+      MatchSettlementView.withdrawal =>
+        (context.tx('انصراف ثبت شد', 'Withdrawal recorded'), NxColors.gold, Icons.exit_to_app_rounded),
+      MatchSettlementView.disputed =>
+        (context.tx('نتیجه مورد اختلاف است', 'Result disputed'), NxColors.danger, Icons.report_problem_rounded),
+      MatchSettlementView.closed =>
+        (context.tx('مسابقه بدون نتیجه بسته شد', 'Match closed without a result'), NxColors.danger, Icons.report_problem_rounded),
+      MatchSettlementView.settled => switch (r.outcome) {
+          GameOutcome.win => (context.tx('پیروزی!', 'Victory!'), NxColors.gold, Icons.emoji_events_rounded),
+          GameOutcome.draw => (context.tx('مساوی', 'Draw'), NxColors.turquoise, Icons.handshake_rounded),
+          GameOutcome.loss => (context.tx('شکست', 'Defeat'), NxColors.danger, Icons.sentiment_dissatisfied_rounded),
+        },
+    };
     final String summary = settled ? (_resultNoteFa == null ? '' : context.tx(_resultNoteFa!, _resultNoteEn ?? '')) : '';
     return Container(
       color: Colors.black.withValues(alpha: 0.72),
@@ -422,9 +458,12 @@ class _OnlineMatchPageState extends ConsumerState<OnlineMatchPage>
         if (_oracleLine != null) OracleResultLine(text: _oracleLine!),
         const SizedBox(height: 10),
         Text(
-          end == null
-              ? context.tx('تا ثبت نتیجه در سرور، رکورد یا پاداشی ثبت نمی‌شود.',
-                  'No record or reward is granted until the server settles the match.')
+          view == MatchSettlementView.withdrawal
+              ? context.tx('هم‌تیمی‌ها بازی را ادامه می‌دهند. نتیجهٔ این مسابقه بعداً در سرور ثبت می‌شود؛ فعلاً پاداشی دریافت نمی‌کنی.',
+                  'Your teammates continue playing. The server will settle the match later; no reward is granted yet.')
+              : end == null
+                  ? context.tx('تا ثبت نتیجه در سرور، رکورد یا پاداشی ثبت نمی‌شود.',
+                      'No record or reward is granted until the server settles the match.')
               : settled
                   ? context.tx('نتیجه در سرور ثبت شد؛ کیف پول در حال همگام‌سازی است.',
                       'Server result recorded; wallet is syncing.')

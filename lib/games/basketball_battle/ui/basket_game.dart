@@ -527,7 +527,7 @@ class _BasketGameState extends ArcadeLoopState<BasketGame> {
           onPanUpdate: _panUpdate,
           onPanEnd: _panEnd,
           onPanCancel: _panCancel,
-          child: CustomPaint(painter: ArcadePainter(_paint, frame), size: Size.infinite),
+          child: flameCanvas(_paint),
         ),
         ValueListenableBuilder<int>(
           valueListenable: frame,

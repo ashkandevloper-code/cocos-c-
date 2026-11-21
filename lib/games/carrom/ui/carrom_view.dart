@@ -8,6 +8,7 @@ import 'package:nexora/core/storage/local_store.dart';
 import 'package:nexora/games/shared/wood_pieces.dart';
 import 'package:nexora/core/theme/nx_theme.dart';
 import 'package:nexora/games/core/game_contract.dart';
+import '../../arcade_kit/arcade_loop.dart';
 import '../core/carrom_config.dart';
 import '../core/carrom_match.dart';
 import 'cr_controller.dart';
@@ -213,8 +214,7 @@ class _CarromViewState extends State<CarromView>
                                   _c.onPanUpdate(d.localPosition),
                               onPanEnd: (DragEndDetails d) => _c.onPanEnd(),
                               onPanCancel: _c.onPanCancel,
-                              child: CustomPaint(
-                                size: Size(cons.maxWidth, cons.maxHeight),
+                              child: ArcadeFlameCanvas(
                                 painter: CrPainter(_c, _images,
                                     accent: theme.accent,
                                     accentSecondary: theme.accentSecondary,

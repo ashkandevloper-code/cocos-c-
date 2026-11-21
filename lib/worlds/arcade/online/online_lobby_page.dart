@@ -13,6 +13,7 @@ import '../../../core/online/social_api.dart';
 import '../../../core/settings/app_settings.dart';
 import '../../../core/theme/nx_theme.dart';
 import '../../../core/widgets/nx_widgets.dart';
+import '../../../core/widgets/profile_preview.dart';
 import '../../../games/game_registry.dart';
 import 'online_match_page.dart';
 
@@ -459,6 +460,7 @@ class _OnlineLobbyPageState extends ConsumerState<OnlineLobbyPage> {
                 children: <Widget>[
                   for (final NxUser f in friends)
                     ListTile(
+                      onTap: () => showProfilePreview(ctx, f.id, name: f.username, avatar: f.avatar),
                       leading: CircleAvatar(
                         backgroundColor:
                             f.isOnlineNow ? NxColors.success : NxColors.glass,
@@ -897,15 +899,19 @@ class _OnlineLobbyPageState extends ConsumerState<OnlineLobbyPage> {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              p == null
-                  ? context.tx('جای خالی', 'Open seat')
-                  : (p.userId == _me
-                      ? '${p.name} (${context.tx('تو', 'you')})'
-                      : p.name),
-              style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: p == null ? NxColors.textDim : null),
+            child: GestureDetector(
+              onTap: p == null ? null : () => showProfilePreview(context, p.userId, name: p.name),
+              child: Text(
+                p == null
+                    ? context.tx('جای خالی', 'Open seat')
+                    : (p.userId == _me
+                        ? '${p.name} (${context.tx('تو', 'you')})'
+                        : p.name),
+                style: TextStyle(
+                    decoration: p == null ? null : TextDecoration.underline,
+                    fontWeight: FontWeight.w700,
+                    color: p == null ? NxColors.textDim : null),
+              ),
             ),
           ),
           if (p != null && r['host'] == p.userId)

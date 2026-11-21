@@ -129,10 +129,16 @@ class SupabaseMatchLink extends ChangeNotifier implements NetLink {
   MatchEnd? _end;
   MatchEnd? get end => _end;
   bool get isOver => _status != 'playing';
+  /// Presence is only a hint while the channel is subscribed and its state
+  /// has synchronized; the move/status poll works even without Realtime.
+  bool get realtimePresenceReady => _presenceReady;
 
   RealtimeChannel? _ch;
   Timer? _poll;
   Timer? _watch;
+  Timer? _heartbeat;
+  bool _pingSupported = true;
+  bool _presenceReady = false;
   bool _disposed = false;
 
   final Map<int, NetMove> _rows = <int, NetMove>{};
@@ -157,6 +163,8 @@ class SupabaseMatchLink extends ChangeNotifier implements NetLink {
 
   @override
   int get seatCount => _players.length;
+  /// Auth user IDs in server-defined seat order (for profile previews only).
+  List<String> get playerIds => List<String>.unmodifiable(_players);
   @override
   Set<int> get connectedSeats => Set<int>.unmodifiable(_connected);
   @override
@@ -174,6 +182,9 @@ class SupabaseMatchLink extends ChangeNotifier implements NetLink {
 
   @override
   bool get isAuthority {
+    // An empty/stale Presence list after a disconnect is not evidence the
+    // other phones left. Never take over their automatic turns on that basis.
+    if (_c != null && !_presenceReady) return false;
     final List<int> alive = <int>[
       for (int s = 0; s < seatCount; s++)
         if (!_forfeited.contains(s) && (_connected.contains(s) || s == mySeat)) s,
@@ -217,23 +228,59 @@ class SupabaseMatchLink extends ChangeNotifier implements NetLink {
             }
           },
         )
-        .onPresenceSync((_) => _syncPresence())
+        .onPresenceSync((_) => _syncPresence(synchronized: true))
         .onPresenceJoin((_) => _syncPresence())
         .onPresenceLeave((_) => _syncPresence())
         .subscribe((RealtimeSubscribeStatus status, Object? error) {
+          if (_disposed) return;
           if (status == RealtimeSubscribeStatus.subscribed) {
+            // Wait for a fresh Presence sync before treating an absent seat
+            // as forfeited. Poll catches up moves and terminal state now.
+            _presenceReady = false;
+            _absentSince.clear();
+            _connected
+              ..clear()
+              ..add(mySeat);
+            notifyListeners();
             unawaited(ch.track(<String, dynamic>{'seat': mySeat, 'uid': _uid}));
             unawaited(_catchUp());
+            unawaited(_pingMatch());
+          } else {
+            _presenceReady = false;
+            _absentSince.clear();
+            _connected
+              ..clear()
+              ..add(mySeat);
+            notifyListeners();
           }
+          if (error != null) debugPrint('match realtime: $error (log poll continues)');
         });
     _ch = ch;
     _poll = Timer.periodic(const Duration(seconds: 4), (_) => unawaited(_catchUp()));
     _watch = Timer.periodic(const Duration(seconds: 5), (_) => _watchAbsent());
+    _heartbeat = Timer.periodic(const Duration(seconds: 12), (_) => unawaited(_pingMatch()));
   }
 
-  void _syncPresence() {
+  Future<void> _pingMatch() async {
+    final SupabaseClient? c = _c;
+    if (_disposed || isOver || !_pingSupported || c == null || mySeat < 0) return;
+    try {
+      await c.rpc('nx_match_ping', params: <String, dynamic>{'p_match': matchId});
+    } on PostgrestException catch (e) {
+      // A rolling deployment may temporarily have the previous games schema.
+      // Do not repeatedly call an RPC that has not been installed yet.
+      if (e.code == 'PGRST202') _pingSupported = false;
+    } catch (_) {
+      // Network interruptions stop refreshing presence; the server protects
+      // the seat for its reconnect grace before another player can forfeit it.
+    }
+  }
+
+  void _syncPresence({bool synchronized = false}) {
     final RealtimeChannel? ch = _ch;
-    if (ch == null) return;
+    if (ch == null || _disposed || (!_presenceReady && !synchronized)) return;
+    final bool wasReady = _presenceReady;
+    _presenceReady = true;
     final Set<int> now = <int>{};
     for (final SinglePresenceState st in ch.presenceState()) {
       for (final Presence p in st.presences) {
@@ -242,7 +289,7 @@ class SupabaseMatchLink extends ChangeNotifier implements NetLink {
       }
     }
     now.add(mySeat);
-    if (!setEquals(now, _connected)) {
+    if (!wasReady || !setEquals(now, _connected)) {
       _connected
         ..clear()
         ..addAll(now);
@@ -254,7 +301,9 @@ class SupabaseMatchLink extends ChangeNotifier implements NetLink {
   }
 
   void _watchAbsent() {
-    if (isOver || !isAuthority) return;
+    // An older server without nx_match_ping cannot prove absence; let humans
+    // keep playing via the log, but do not automatically forfeit anyone.
+    if (isOver || !_presenceReady || !_pingSupported || !isAuthority) return;
     final DateTime now = DateTime.now();
     for (int s = 0; s < seatCount; s++) {
       if (s == mySeat || _forfeited.contains(s) || _connected.contains(s)) continue;
@@ -578,12 +627,21 @@ class SupabaseMatchLink extends ChangeNotifier implements NetLink {
     }
   }
 
-  /// Leave the running match (counts as forfeit).
-  Future<void> forfeit() async {
-    if (isOver) return;
+  /// Leave the running match (counts as forfeit only after server ACK).
+  @override
+  Future<bool> forfeit() async {
+    if (isOver) return true;
+    final SupabaseClient? c = _c;
+    if (c == null) return false;
     try {
-      await _c?.rpc('nx_forfeit', params: <String, dynamic>{'p_match': matchId});
-    } catch (_) {}
+      final dynamic r = await c.rpc('nx_forfeit', params: <String, dynamic>{'p_match': matchId});
+      if (r is! Map || r['ok'] != true) return false;
+      await _catchUp();
+      return true;
+    } catch (e) {
+      debugPrint('forfeit failed: $e');
+      return false;
+    }
   }
 
   @override
@@ -592,6 +650,7 @@ class SupabaseMatchLink extends ChangeNotifier implements NetLink {
     _listener = null;
     _poll?.cancel();
     _watch?.cancel();
+    _heartbeat?.cancel();
     final RealtimeChannel? ch = _ch;
     if (ch != null) unawaited(_c?.removeChannel(ch));
     unawaited(_live.close());

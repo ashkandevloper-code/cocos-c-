@@ -11,6 +11,7 @@ import '../../core/theme/nx_theme.dart';
 import '../../core/ui2/anix_kit.dart';
 import '../../core/ui2/nx2_widgets.dart';
 import '../../core/widgets/nx_widgets.dart';
+import '../../core/widgets/profile_preview.dart';
 import '../../games/game_registry.dart';
 import '../../games/arcade_kit/arcade_icon.dart';
 
@@ -110,27 +111,42 @@ class _RoomsPageState extends ConsumerState<RoomsPage> {
   /// Opens a new conversation room (voice + chat; games are picked inside).
   Future<void> _openTalk() async {
     final TextEditingController name = TextEditingController();
-    final String? title = await showDialog<String>(
+    bool private = false;
+    final (String, bool)? choice = await showDialog<(String, bool)>(
       context: context,
-      builder: (BuildContext ctx) => AlertDialog(
-        title: Text(ctx.tx('اتاق جدید', 'New room')),
-        content: TextField(
-          controller: name,
-          autofocus: true,
-          maxLength: 60,
-          decoration: InputDecoration(hintText: ctx.tx('نام اتاق (اختیاری)', 'Room name (optional)')),
+      builder: (BuildContext ctx) => StatefulBuilder(
+        builder: (BuildContext ctx, StateSetter update) => AnixDialog(
+          title: Text(ctx.tx('اتاق جدید', 'New room')),
+          content: Column(mainAxisSize: MainAxisSize.min, children: <Widget>[
+            TextField(
+              controller: name,
+              autofocus: true,
+              maxLength: 60,
+              decoration: InputDecoration(hintText: ctx.tx('نام اتاق (اختیاری)', 'Room name (optional)')),
+            ),
+            SwitchListTile(
+              title: Text(ctx.tx('فقط با دعوت مدیر', 'Invite-only admission')),
+              subtitle: Text(ctx.tx('اعضا سقف مشترک ندارند؛ جایگاه‌های بازی محدودند.',
+                  'Social members have no shared cap; game seats are rule-bound.')),
+              value: private,
+              onChanged: (bool v) => update(() => private = v),
+            ),
+          ]),
+          actions: <Widget>[
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(ctx.tx('انصراف', 'Cancel'))),
+            FilledButton(onPressed: () => Navigator.pop(ctx, (name.text.trim(), private)),
+                child: Text(ctx.tx('ساخت', 'Create'))),
+          ],
         ),
-        actions: <Widget>[
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(ctx.tx('انصراف', 'Cancel'))),
-          FilledButton(onPressed: () => Navigator.pop(ctx, name.text.trim()), child: Text(ctx.tx('ساخت', 'Create'))),
-        ],
       ),
     );
-    if (title == null || !mounted) return;
+    name.dispose();
+    if (choice == null || !mounted) return;
     final OnlineService o = ref.read(onlineProvider);
     try {
       await o.gamesHello();
-      final dynamic r = await o.games!.rpc('nx_room_open', params: <String, dynamic>{'p_title': title});
+      final dynamic r = await o.games!.rpc('nx_room_open',
+          params: <String, dynamic>{'p_title': choice.$1, 'p_private': choice.$2});
       if (!mounted) return;
       await context.push('/room/${(r as Map)['room_id']}');
       unawaited(_load(silent: true));
@@ -167,6 +183,13 @@ class _RoomsPageState extends ConsumerState<RoomsPage> {
                   style: const TextStyle(color: Nx2.muted, fontSize: 12, fontWeight: FontWeight.w700)),
             ]),
           ),
+          if (isProfileUserId('${r['host'] ?? ''}'))
+            IconButton(
+              tooltip: context.tx('پروفایل مدیر', 'Host profile'),
+              icon: const Icon(Icons.person_outline_rounded, color: Nx2.gold, size: 20),
+              onPressed: () => showProfilePreview(context, '${r['host']}',
+                  name: '${r['host_name'] ?? 'Pilot'}'),
+            ),
           const Icon(Icons.people_alt_rounded, color: Nx2.cyan, size: 18),
           const SizedBox(width: 4),
           Text('${r['members'] ?? 0}',
@@ -195,8 +218,7 @@ class _RoomsPageState extends ConsumerState<RoomsPage> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(14, 8, 14, 24),
           children: <Widget>[
-            Nx2Banner(text: context.tx('اتاق‌های زنده', 'LIVE ROOMS'), height: 56),
-            const SizedBox(height: 12),
+            const SizedBox(height: 6),
             Row(children: <Widget>[
               Expanded(
                 child: Nx2Button(
@@ -227,13 +249,13 @@ class _RoomsPageState extends ConsumerState<RoomsPage> {
               onTap: _openTalk,
             ),
             const SizedBox(height: 10),
-            Nx2Button(
-              label: context.tx('همه‌ی بازی‌ها (آفلاین و با ربات)', 'ALL GAMES (offline & vs bot)'),
-              icon: Icons.sports_esports_rounded,
-              kind: Nx2ButtonKind.violet,
-              height: 50,
-              fontSize: 13,
-              onTap: () => context.push('/world/nexora_arcade'),
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: TextButton.icon(
+                onPressed: () => context.push('/world/nexora_arcade'),
+                icon: const Icon(Icons.sports_esports_rounded, size: 18),
+                label: Text(context.tx('بازی آفلاین و با ربات', 'Offline & vs bot games')),
+              ),
             ),
             if (_talk.isNotEmpty) ...<Widget>[
               const SizedBox(height: 18),
@@ -307,6 +329,12 @@ class _RoomsPageState extends ConsumerState<RoomsPage> {
                   style: const TextStyle(color: Nx2.muted, fontSize: 12, fontWeight: FontWeight.w700)),
             ]),
           ),
+          if (isProfileUserId('${r['host'] ?? ''}'))
+            IconButton(
+              tooltip: context.tx('پروفایل میزبان', 'Host profile'),
+              icon: const Icon(Icons.person_outline_rounded, color: Nx2.gold, size: 20),
+              onPressed: () => showProfilePreview(context, '${r['host']}'),
+            ),
           Text('$n/$seats',
               style: const TextStyle(color: Nx2.cyan, fontWeight: FontWeight.w900, fontSize: 16)),
           const SizedBox(width: 6),

@@ -19,8 +19,11 @@ class CallWatcher {
   final void Function(String chatId, String callId, bool video, String title) _open;
 
   RealtimeChannel? _ch;
+  Timer? _poll;
   String? _uid;
+  bool _catchingUp = false;
   final Set<String> _seen = <String>{};
+  final Set<String> _ringing = <String>{};
 
   void sync() {
     final OnlineService o = _ref.read(onlineProvider);
@@ -28,6 +31,7 @@ class CallWatcher {
     if (uid == _uid) return;
     _detach();
     _uid = uid;
+    _seen.clear();
     final SupabaseClient? c = o.client;
     if (uid == null || c == null) return;
     _ch = c
@@ -38,13 +42,41 @@ class CallWatcher {
           table: 'nx_calls',
           callback: (PostgresChangePayload p) => unawaited(_ring(c, uid, p.newRecord)),
         )
-        .subscribe();
+        .subscribe((RealtimeSubscribeStatus status, Object? error) {
+          if (status == RealtimeSubscribeStatus.subscribed && _uid == uid) {
+            unawaited(_pending(c, uid));
+          }
+          if (error != null) debugPrint('call realtime: $error (polling continues)');
+        });
+    unawaited(_pending(c, uid));
+    _poll = Timer.periodic(const Duration(seconds: 12), (_) => unawaited(_pending(c, uid)));
+  }
+
+  Future<void> _pending(SupabaseClient c, String uid) async {
+    if (_uid != uid || _catchingUp) return;
+    _catchingUp = true;
+    try {
+      final List<dynamic> rows = await c.from('nx_calls').select()
+          .isFilter('ended_at', null)
+          .neq('caller', uid)
+          .gte('created_at', DateTime.now().toUtc().subtract(const Duration(seconds: 60)).toIso8601String())
+          .order('created_at', ascending: false).limit(10);
+      if (_uid != uid) return;
+      for (final dynamic r in rows.reversed) {
+        await _ring(c, uid, Map<String, dynamic>.from(r as Map));
+      }
+    } catch (_) {
+      // Realtime or the next poll retries after an offline interval.
+    } finally {
+      _catchingUp = false;
+    }
   }
 
   Future<void> _ring(SupabaseClient c, String uid, Map<String, dynamic> r) async {
     final String id = '${r['id']}';
     final String caller = '${r['caller']}';
-    if (caller == uid || !_seen.add(id)) return;
+    if (_uid != uid || caller == uid || _seen.contains(id) || !_ringing.add(id)) return;
+    try {
     final String chatId = '${r['chat_id']}';
     final bool video = r['video'] == true;
     String who = 'Pilot';
@@ -55,9 +87,11 @@ class CallWatcher {
       final Map<String, dynamic>? ch = await c.from('nx_chats').select('kind, name').eq('id', chatId).maybeSingle();
       title = ch == null || ch['kind'] == 'direct' ? who : '${ch['name']}';
     } catch (_) {}
-    final bool fa = _ref.read(settingsProvider).isFa;
+    if (_uid != uid) return;
     final ScaffoldMessengerState? m = _messenger.currentState;
     if (m == null) return;
+    final bool fa = _ref.read(settingsProvider).isFa;
+    _seen.add(id);
     m.showSnackBar(SnackBar(
       duration: const Duration(seconds: 30),
       content: Row(children: <Widget>[
@@ -71,9 +105,15 @@ class CallWatcher {
       ]),
       action: SnackBarAction(label: fa ? 'پاسخ' : 'Answer', onPressed: () => _open(chatId, id, video, title)),
     ));
+    } finally {
+      _ringing.remove(id);
+    }
   }
 
   void _detach({bool disposing = false}) {
+    _poll?.cancel();
+    _poll = null;
+    _uid = null;
     final RealtimeChannel? ch = _ch;
     _ch = null;
     if (ch == null) return;

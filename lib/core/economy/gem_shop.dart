@@ -24,7 +24,7 @@ String teamItemId(String teamId) => teamId == 'custom' || fsCustomOwner(teamId) 
 
 /// Built-in gem price of a team (the server catalog, editable by admins, wins when loaded). Free teams cost 0; every
 /// other team costs 150..500 gems by strength (power + accuracy 9..20, rounded to 10): weakest 150, luxury 10/10 500.
-/// supabase/migrations/20261120000000_nx_gems_shop.sql seeds nx_catalog with exactly these numbers.
+/// The original catalog seed and 20261121150000_nx_fs_car_roster.sql seed these numbers.
 int defaultTeamPrice(String teamId) {
   if (teamItemId(teamId) == kFsCustomItem) return kFsCustomPrice;
   if (kFreeTeams.contains(teamId)) return 0;
@@ -80,7 +80,13 @@ class GemShop extends ChangeNotifier {
       ? kFsCustomPrice
       : kFreeTeams.contains(teamId) ? 0 : (_prices[teamItemId(teamId)] ?? defaultTeamPrice(teamId));
 
-  bool teamForSale(String teamId) => !_inactive.contains(teamItemId(teamId));
+  /// Only advertise a purchase when the server actually lists it. In
+  /// particular, newly bundled art may arrive before its catalog migration;
+  /// a fallback *display* price is not proof the server can sell the team.
+  bool teamForSale(String teamId) {
+    final String item = teamItemId(teamId);
+    return online && loaded && _prices.containsKey(item) && !_inactive.contains(item);
+  }
 
   String? get _signedInUid => _c?.auth.currentUser?.id;
 

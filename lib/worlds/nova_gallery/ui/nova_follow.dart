@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/settings/app_settings.dart';
+import '../../../core/online/online_service.dart';
+import '../../../core/online/social_api.dart';
+import '../../../core/widgets/profile_preview.dart';
 import '../../../core/theme/nx_theme.dart';
 import '../data/supabase_nova_repository.dart';
 import '../state/nova_controller.dart';
@@ -18,11 +21,15 @@ class NovaFollowBar extends ConsumerStatefulWidget {
 }
 
 class _NovaFollowBarState extends ConsumerState<NovaFollowBar> {
-  ({int followers, int following})? _n;
-  bool? _following;
+  NxSocialProfile? _profile;
   bool _busy = false;
 
-  SupabaseNovaRepository? get _repo => ref.read(novaControllerProvider).online;
+  // This bar also appears in talk rooms; it must not depend on a NOVA tab
+  // having been opened first. Use the same privacy-aware RPC as the preview.
+  SocialApi? get _api {
+    final c = ref.read(onlineProvider).client;
+    return c?.auth.currentSession == null ? null : SocialApi(c!);
+  }
 
   @override
   void initState() {
@@ -30,24 +37,27 @@ class _NovaFollowBarState extends ConsumerState<NovaFollowBar> {
     _load();
   }
 
+  @override
+  void didUpdateWidget(NovaFollowBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.uid != widget.uid) {
+      _profile = null;
+      _load();
+    }
+  }
+
   Future<void> _load() async {
-    final SupabaseNovaRepository? r = _repo;
-    if (r == null) return;
+    final SocialApi? api = _api;
+    if (api == null || !isProfileUserId(widget.uid)) return;
     try {
-      final ({int followers, int following}) n = await r.followCounts(widget.uid);
-      final bool? f = widget.self ? null : await r.isFollowing(widget.uid);
-      if (mounted) {
-        setState(() {
-          _n = n;
-          _following = f;
-        });
-      }
+      final NxSocialProfile p = await api.socialProfile(widget.uid);
+      if (mounted && p.id == widget.uid) setState(() => _profile = p);
     } catch (_) {}
   }
 
   @override
   Widget build(BuildContext context) {
-    final ({int followers, int following})? n = _n;
+    final NxSocialProfile? p = _profile;
     Widget stat(String v, String l) => Expanded(
           child: Column(children: <Widget>[
             Text(v, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
@@ -55,17 +65,18 @@ class _NovaFollowBarState extends ConsumerState<NovaFollowBar> {
           ]),
         );
     return Row(children: <Widget>[
-      stat(n == null ? '–' : '${n.followers}', context.tx('دنبال‌کننده', 'Followers')),
-      stat(n == null ? '–' : '${n.following}', context.tx('دنبال‌شونده', 'Following')),
-      if (!widget.self && _following != null)
+      stat(p == null ? '–' : '${p.followers}', context.tx('دنبال‌کننده', 'Followers')),
+      stat(p == null ? '–' : '${p.following}', context.tx('دنبال‌شونده', 'Following')),
+      if (!widget.self && p != null && !p.isMe)
         Expanded(
-          child: _following!
+          child: p.isFollowing || p.isPending
               ? OutlinedButton(
-                  onPressed: _busy ? null : () => _toggle(false),
-                  child: Text(context.tx('دنبال می‌کنی', 'Following')),
+                  onPressed: _busy || p.isBlocked ? null : () => _toggle(false),
+                  child: Text(p.isPending ? context.tx('درخواست فرستاده شد', 'Requested')
+                      : context.tx('دنبال می‌کنی', 'Following')),
                 )
               : FilledButton(
-                  onPressed: _busy ? null : () => _toggle(true),
+                  onPressed: _busy || p.isBlocked ? null : () => _toggle(true),
                   child: Text(context.tx('دنبال کن', 'Follow')),
                 ),
         ),
@@ -73,28 +84,18 @@ class _NovaFollowBarState extends ConsumerState<NovaFollowBar> {
   }
 
   Future<void> _toggle(bool on) async {
-    final SupabaseNovaRepository? r = _repo;
-    if (r == null) return;
+    final SocialApi? api = _api;
+    if (api == null) return;
     setState(() => _busy = true);
     try {
-      await r.setFollow(widget.uid, on);
-      if (mounted) {
-        setState(() {
-          _following = on;
-          if (_n != null) {
-            _n = (followers: _n!.followers + (on ? 1 : -1), following: _n!.following);
-          }
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(context.tx('عملیات دنبال‌کردن ناموفق بود.', 'Follow action failed.'))));
-      }
+      final NxSocialProfile next = await api.setFollow(widget.uid, on);
+      if (mounted) setState(() => _profile = next);
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(context.tx('عملیات دنبال‌کردن ناموفق بود.', 'Follow action failed.'))));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
-    await _load();
   }
 }
 
@@ -124,6 +125,11 @@ class NovaUserLookup extends ConsumerWidget {
               style: const TextStyle(color: NxColors.textDim)),
           const SizedBox(height: 10),
           NovaFollowBar(uid: uid, self: uid == r.me),
+          if (uid != r.me) TextButton.icon(
+            onPressed: () => showProfilePreview(context, uid, name: '${p['username'] ?? username}'),
+            icon: const Icon(Icons.chat_bubble_outline_rounded),
+            label: Text(context.tx('پروفایل و پیام', 'Profile & message')),
+          ),
         ]);
       },
     );

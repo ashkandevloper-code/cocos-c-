@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/profile/profile_service.dart';
+import '../../../core/online/online_service.dart';
+import '../../../core/widgets/profile_preview.dart';
 import '../../../core/settings/app_settings.dart';
 import '../../../core/theme/nx_theme.dart';
 import '../models/nova_models.dart';
@@ -166,11 +168,27 @@ class _NovaStoryViewerState extends ConsumerState<NovaStoryViewer> with SingleTi
                 ]),
                 const SizedBox(height: 10),
                 Row(children: <Widget>[
-                  NovaAvatar(name: s.authorName, size: 36),
+                  GestureDetector(
+                    onTap: () {
+                      _progress.stop();
+                      showProfilePreview(context,
+                          mine ? (ref.read(onlineProvider).uid ?? s.authorId) : s.authorId,
+                          name: s.authorName).whenComplete(() { if (mounted) _progress.forward(); });
+                    },
+                    child: NovaAvatar(name: s.authorName, size: 36),
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
-                      Text(s.authorName, style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.white)),
+                      GestureDetector(
+                        onTap: () {
+                          _progress.stop();
+                          showProfilePreview(context,
+                              mine ? (ref.read(onlineProvider).uid ?? s.authorId) : s.authorId,
+                              name: s.authorName).whenComplete(() { if (mounted) _progress.forward(); });
+                        },
+                        child: Text(s.authorName, style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.white)),
+                      ),
                       Text(
                         context.tx('${novaAgo(context, s.createdAt)} · ${left.inHours} ساعت مانده',
                             '${novaAgo(context, s.createdAt)} · ${left.inHours}h left'),
