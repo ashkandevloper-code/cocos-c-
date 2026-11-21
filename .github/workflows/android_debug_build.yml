@@ -47,6 +47,23 @@ jobs:
                   text = text.replace('compileOptions {', 'compileOptions {\n        coreLibraryDesugaringEnabled true', 1)
                   text += "\ndependencies {\n    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'\n}\n"
               open(path, 'w', encoding='utf-8').write(text)
+          open('android/nx_force_sdk.gradle', 'w', encoding='utf-8').write(
+              "afterEvaluate { p ->\n"
+              "  try {\n"
+              "    if (p.extensions.findByName('android') != null) {\n"
+              "      def a = p.extensions.getByName('android')\n"
+              "      a.compileSdk = 36\n"
+              "    }\n"
+              "  } catch (ignored) {}\n"
+              "}\n")
+          for path in glob.glob('android/build.gradle*'):
+              text = open(path, encoding='utf-8').read()
+              if 'nx_force_sdk.gradle' in text:
+                  continue
+              hook = ('\nsubprojects {\n    apply(from = rootProject.file("nx_force_sdk.gradle"))\n}\n'
+                      if path.endswith('.kts') else
+                      "\nsubprojects {\n    apply from: rootProject.file('nx_force_sdk.gradle')\n}\n")
+              open(path, 'w', encoding='utf-8').write(text + hook)
           PY
       - name: Install dependencies
         run: flutter pub get
