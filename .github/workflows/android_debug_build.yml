@@ -47,26 +47,24 @@ jobs:
                   text = text.replace('compileOptions {', 'compileOptions {\n        coreLibraryDesugaringEnabled true', 1)
                   text += "\ndependencies {\n    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'\n}\n"
               open(path, 'w', encoding='utf-8').write(text)
-          open('android/nx_force_sdk.gradle', 'w', encoding='utf-8').write(
-              "afterEvaluate { p ->\n"
-              "  try {\n"
-              "    if (p.extensions.findByName('android') != null) {\n"
-              "      def a = p.extensions.getByName('android')\n"
-              "      a.compileSdk = 36\n"
-              "    }\n"
-              "  } catch (ignored) {}\n"
-              "}\n")
-          for path in glob.glob('android/build.gradle*'):
-              text = open(path, encoding='utf-8').read()
-              if 'nx_force_sdk.gradle' in text:
-                  continue
-              hook = ('\nsubprojects {\n    apply(from = rootProject.file("nx_force_sdk.gradle"))\n}\n'
-                      if path.endswith('.kts') else
-                      "\nsubprojects {\n    apply from: rootProject.file('nx_force_sdk.gradle')\n}\n")
-              open(path, 'w', encoding='utf-8').write(text + hook)
           PY
       - name: Install dependencies
         run: flutter pub get
+      - name: Normalize Android compile SDK
+        run: |
+          python3 - <<'PY'
+          import pathlib, re
+          roots = [pathlib.Path('android'), pathlib.Path.home() / '.pub-cache']
+          for root in roots:
+              if not root.exists():
+                  continue
+              for path in root.rglob('build.gradle*'):
+                  text = path.read_text(encoding='utf-8')
+                  updated = re.sub(r'compileSdk(?:Version)?\s*(?:=\s*)?(?:flutter\.compileSdkVersion|\d+)',
+                                   lambda m: 'compileSdk = 36' if path.suffix == '.kts' else 'compileSdkVersion 36', text)
+                  if updated != text:
+                      path.write_text(updated, encoding='utf-8')
+          PY
       - name: Build debug APK
         run: |
           set -o pipefail
