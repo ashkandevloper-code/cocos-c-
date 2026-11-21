@@ -876,6 +876,7 @@ class _AnixGameCardState extends State<AnixGameCard> {
           ]);
         }),
       ),
+      ),
     );
   }
 }
