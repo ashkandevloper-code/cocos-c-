@@ -28,10 +28,57 @@ void main() {
 
   test('recordGame updates stats and unlocks first-game achievement', () {
     final p = ProfileService(LocalStore.instance);
-    final o = p.recordGame(gameId: 'quiz', gameNameFa: 'کوییز', gameNameEn: 'Quiz', outcome: 'win', score: 9);
+    final o = p.recordGame(
+      gameId: 'quiz',
+      gameNameFa: 'کوییز',
+      gameNameEn: 'Quiz',
+      outcome: 'win',
+      score: 9,
+    );
     expect(p.stats['quiz']!.won, 1);
     expect(o.unlocked.any((a) => a.id == 'first_game'), isTrue);
     expect(p.achievements.contains('first_game'), isTrue);
+  });
+
+  test('online result recording is idempotent per server match id', () {
+    final p = ProfileService(LocalStore.instance);
+    expect(
+      p.recordOnlineGame(
+        gameId: 'ludo',
+        gameNameFa: 'لودو',
+        gameNameEn: 'Ludo',
+        matchId: 'match-once',
+        outcome: 'win',
+        score: 4,
+      ),
+      isTrue,
+    );
+    expect(
+      p.recordOnlineGame(
+        gameId: 'ludo',
+        gameNameFa: 'لودو',
+        gameNameEn: 'Ludo',
+        matchId: 'match-once',
+        outcome: 'win',
+        score: 4,
+      ),
+      isFalse,
+    );
+    expect(p.stats['ludo']!.played, 1);
+    expect(p.stats['ludo']!.won, 1);
+    final restored = ProfileService(LocalStore.instance);
+    expect(
+      restored.recordOnlineGame(
+        gameId: 'ludo',
+        gameNameFa: 'لودو',
+        gameNameEn: 'Ludo',
+        matchId: 'match-once',
+        outcome: 'win',
+        score: 4,
+      ),
+      isFalse,
+    );
+    expect(restored.stats['ludo']!.played, 1);
   });
 
   test('purchase is deterministic and cannot overspend', () {

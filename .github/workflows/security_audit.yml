@@ -1,0 +1,40 @@
+name: ANIX PRO Security Audit
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  dependency-audit:
+    name: Audit locked dependencies with OSV-Scanner
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@0e457b42d0120153c352875e9b758b1e5c58c7e5 # v2.7.1
+    with:
+      scan-args: |-
+        --lockfile=./pubspec.lock
+    permissions:
+      contents: read
+      security-events: write
+
+  secret-audit:
+    name: Detect committed secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Scan tracked source files with Gitleaks
+        run: |
+          docker run --rm \
+            --volume "$GITHUB_WORKSPACE:/repo" \
+            ghcr.io/gitleaks/gitleaks:v8.30.1 \
+            dir /repo --redact --report-format=sarif --report-path=/repo/gitleaks.sarif
+      - name: Upload secret scan report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: anix-pro-gitleaks-${{ github.sha }}
+          path: gitleaks.sarif
+          if-no-files-found: warn
+          retention-days: 14

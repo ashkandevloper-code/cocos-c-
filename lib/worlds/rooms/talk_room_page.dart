@@ -16,6 +16,7 @@ import '../../core/settings/app_settings.dart';
 import '../../core/ui2/anix_kit.dart';
 import '../../core/ui2/nx2_widgets.dart';
 import '../../core/widgets/user_avatar.dart';
+
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../games/finger_soccer/core/bm_data.dart';
@@ -35,20 +36,14 @@ class TalkRoomPage extends ConsumerStatefulWidget {
   ConsumerState<TalkRoomPage> createState() => _TalkRoomPageState();
 }
 
-/// Player limits per game inside a room (mirrors nx_game_bounds on the games project).
+/// Active player seats per game inside a room (mirrors nx_game_bounds on the games project).
+/// Room spectators are tracked separately and are not constrained by these game-seat limits.
 class TalkRoomLimits {
-  static int maxPlayersFor(String game) => switch (game) {
-        'finger_soccer' || 'carrom' => 6,
-        'mafia' || 'spy_mafia' => 12,
-        'quiz' => 21,
-        _ => gameById(game)?.maxPlayers ?? 2,
-      };
+  static int maxPlayersFor(String game) =>
+      gameById(game)?.onlineMaxPlayers ?? gameById(game)?.maxPlayers ?? 2;
 
-  static int minPlayersFor(String game) => switch (game) {
-        'mafia' => 6,
-        'spy_mafia' => 3,
-        _ => 2,
-      };
+  static int minPlayersFor(String game) =>
+      gameById(game)?.onlineMinPlayers ?? gameById(game)?.minPlayers ?? 2;
 }
 
 /// v5 finger soccer (owner request 2026-11-20): the room manager swaps Team 1 and Team 2 before the match. Seats
@@ -88,7 +83,8 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
 
   Map<String, dynamic>? _room;
   List<RoomMember> _members = <RoomMember>[];
-  final Map<String, Map<String, dynamic>> _picked = <String, Map<String, dynamic>>{}; // user -> {seat, prefs}
+  final Map<String, Map<String, dynamic>> _picked =
+      <String, Map<String, dynamic>>{}; // user -> {seat, prefs}
   final List<RoomMessage> _messages = <RoomMessage>[];
   final TextEditingController _input = TextEditingController();
   final ScrollController _scroll = ScrollController();
@@ -112,7 +108,8 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
   }
 
   bool get _isManager => _myMember?.isManager ?? false;
-  String get _game => '${_room?['selected_game'] ?? _room?['game'] ?? 'finger_soccer'}';
+  String get _game =>
+      '${_room?['selected_game'] ?? _room?['game'] ?? 'finger_soccer'}';
 
   @override
   void initState() {
@@ -144,13 +141,28 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
     }
     try {
       await o.gamesHello();
-      await c.rpc('nx_room_join', params: <String, dynamic>{'p_room': widget.roomId, 'p_role': 'speaker'});
+      await c.rpc(
+        'nx_room_join',
+        params: <String, dynamic>{'p_room': widget.roomId, 'p_role': 'speaker'},
+      );
       _joined = true;
       await Future.wait(<Future<void>>[_refresh(), _loadMessages()]);
       _subscribe();
-      _poll = Timer.periodic(const Duration(seconds: 6), (_) => unawaited(_refresh()));
-      _ping = Timer.periodic(const Duration(seconds: 60),
-          (_) => unawaited(c.rpc('nx_room_ping', params: <String, dynamic>{'p_room': widget.roomId}).then((_) {}, onError: (Object _) {})));
+      _poll = Timer.periodic(
+        const Duration(seconds: 6),
+        (_) => unawaited(_refresh()),
+      );
+      _ping = Timer.periodic(
+        const Duration(seconds: 60),
+        (_) => unawaited(
+          c
+              .rpc(
+                'nx_room_ping',
+                params: <String, dynamic>{'p_room': widget.roomId},
+              )
+              .then((_) {}, onError: (Object _) {}),
+        ),
+      );
     } catch (e) {
       if (mounted) setState(() => _error = _clean(e));
     }
@@ -170,21 +182,33 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
           event: PostgresChangeEvent.insert,
           schema: 'public',
           table: 'nx_room_messages',
-          filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'room_id', value: widget.roomId),
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'room_id',
+            value: widget.roomId,
+          ),
           callback: (PostgresChangePayload p) => _addMessage(p.newRecord),
         )
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'nx_room_members',
-          filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'room_id', value: widget.roomId),
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'room_id',
+            value: widget.roomId,
+          ),
           callback: (_) => unawaited(_refresh()),
         )
         .onPostgresChanges(
           event: PostgresChangeEvent.update,
           schema: 'public',
           table: 'nx_rooms',
-          filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'id', value: widget.roomId),
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'id',
+            value: widget.roomId,
+          ),
           callback: (_) => unawaited(_refresh()),
         )
         .subscribe();
@@ -192,10 +216,18 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
 
   void _addMessage(Map<String, dynamic> r) {
     final String id = '${r['id']}';
-    if (r['deleted'] == true || _messages.any((RoomMessage m) => m.id == id)) return;
-    if (_joined && '${r['author']}' != _me && _messages.isNotEmpty) NxSfx.instance.play('chat', gain: 0.7);
-    _messages.add(RoomMessage(id, '${r['author']}', '${r['text']}',
-        DateTime.tryParse('${r['created_at']}')?.toLocal() ?? DateTime.now()));
+    if (r['deleted'] == true || _messages.any((RoomMessage m) => m.id == id))
+      return;
+    if (_joined && '${r['author']}' != _me && _messages.isNotEmpty)
+      NxSfx.instance.play('chat', gain: 0.7);
+    _messages.add(
+      RoomMessage(
+        id,
+        '${r['author']}',
+        '${r['text']}',
+        DateTime.tryParse('${r['created_at']}')?.toLocal() ?? DateTime.now(),
+      ),
+    );
     _messages.sort((RoomMessage a, RoomMessage b) => a.at.compareTo(b.at));
     if (mounted) setState(() {});
     _toBottom();
@@ -204,8 +236,11 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
   void _toBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scroll.hasClients) {
-        _scroll.animateTo(_scroll.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 220), curve: Curves.easeOut);
+        _scroll.animateTo(
+          _scroll.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOut,
+        );
       }
     });
   }
@@ -230,7 +265,9 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
     try {
       final Map<String, dynamic>? room = await c
           .from('nx_rooms')
-          .select('id, code, title, game, selected_game, status, match_id, host, settings, kind')
+          .select(
+            'id, code, title, game, selected_game, status, match_id, host, settings, kind',
+          )
           .eq('id', widget.roomId)
           .maybeSingle();
       final List<dynamic> mem = await c
@@ -245,19 +282,26 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
           .order('seat');
       if (!mounted) return;
       final int before = _members.length;
-      if (before > 0 && mem.length != before) NxSfx.instance.play(mem.length > before ? 'join' : 'leave', gain: 0.6);
+      if (before > 0 && mem.length != before)
+        NxSfx.instance.play(mem.length > before ? 'join' : 'leave', gain: 0.6);
       setState(() {
         _room = room;
         _members = mem.map((dynamic r) {
           final Map<String, dynamic> m = Map<String, dynamic>.from(r as Map);
           final dynamic p = m['profiles'];
-          return RoomMember('${m['user_id']}', '${m['role']}', p is Map ? '${p['username'] ?? 'Pilot'}' : 'Pilot',
-              p is Map ? p['avatar'] as String? : null, m['muted'] == true);
+          return RoomMember(
+            '${m['user_id']}',
+            '${m['role']}',
+            p is Map ? '${p['username'] ?? 'Pilot'}' : 'Pilot',
+            p is Map ? p['avatar'] as String? : null,
+            m['muted'] == true,
+          );
         }).toList();
         _picked
           ..clear()
           ..addAll(<String, Map<String, dynamic>>{
-            for (final dynamic r in gp) '${(r as Map)['user_id']}': Map<String, dynamic>.from(r),
+            for (final dynamic r in gp)
+              '${(r as Map)['user_id']}': Map<String, dynamic>.from(r),
           });
       });
       await _syncVoiceRole();
@@ -268,7 +312,12 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
   void _maybeOpenMatch() {
     final Map<String, dynamic>? r = _room;
     final String? mid = r?['match_id'] as String?;
-    if (r == null || r['status'] != 'playing' || mid == null || _inMatch || mid == _lastMatch) return;
+    if (r == null ||
+        r['status'] != 'playing' ||
+        mid == null ||
+        _inMatch ||
+        mid == _lastMatch)
+      return;
     if (!_picked.containsKey(_me)) return;
     unawaited(_openMatch(mid));
   }
@@ -280,9 +329,11 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
     final bool micWas = _mic;
     if (micWas) await _setMic(false);
     if (!mounted) return;
-    await Navigator.of(context).push(MaterialPageRoute<void>(
-      builder: (_) => OnlineMatchPage(matchId: matchId, gameId: _game),
-    ));
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => OnlineMatchPage(matchId: matchId, gameId: _game),
+      ),
+    );
     _inMatch = false;
     if (micWas) await _setMic(true);
     if (mounted) await _refresh();
@@ -295,7 +346,10 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
     if (t.isEmpty || c == null || _sending) return;
     setState(() => _sending = true);
     try {
-      final dynamic r = await c.rpc('nx_room_send_message', params: <String, dynamic>{'p_room': widget.roomId, 'p_text': t});
+      final dynamic r = await c.rpc(
+        'nx_room_send_message',
+        params: <String, dynamic>{'p_room': widget.roomId, 'p_text': t},
+      );
       _input.clear();
       if (r is Map) _addMessage(Map<String, dynamic>.from(r));
     } catch (e) {
@@ -323,12 +377,16 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
       final String? token = g?['token'] as String?;
       if (token == null) throw StateError('${g?['error'] ?? 'no_token'}');
       _canPublish = g?['canPublish'] == true;
-      final lk.Room room = lk.Room(roomOptions: const lk.RoomOptions(adaptiveStream: true, dynacast: true));
+      final lk.Room room = lk.Room(
+        roomOptions: const lk.RoomOptions(adaptiveStream: true, dynacast: true),
+      );
       room.addListener(_onVoice);
       await room.connect('${g?['url'] ?? OnlineConfig.liveKitUrl}', token);
       _voice = room;
       await setRoomIncomingAudio(room, _speaker);
-      room.createListener().on<lk.TrackSubscribedEvent>((lk.TrackSubscribedEvent _) async {
+      room.createListener().on<lk.TrackSubscribedEvent>((
+        lk.TrackSubscribedEvent _,
+      ) async {
         if (!_speaker) await setRoomIncomingAudio(room, false);
       });
     } catch (e) {
@@ -365,7 +423,12 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
     final lk.Room? v = _voice;
     if (v == null) return;
     if (on && !_canPublish) {
-      _snack(context.tx('شنونده هستی؛ مدیر اتاق می‌تواند تو را سخنران کند.', 'You are a listener; the room manager can make you a speaker.'));
+      _snack(
+        context.tx(
+          'شنونده هستی؛ مدیر اتاق می‌تواند تو را سخنران کند.',
+          'You are a listener; the room manager can make you a speaker.',
+        ),
+      );
       return;
     }
     try {
@@ -402,7 +465,9 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
     final lk.Room? v = _voice;
     if (v == null) return false;
     if (userId == _me) return true;
-    return v.remoteParticipants.values.any((lk.RemoteParticipant p) => p.identity == userId);
+    return v.remoteParticipants.values.any(
+      (lk.RemoteParticipant p) => p.identity == userId,
+    );
   }
 
   // ------------------------------------------------------------------ manager actions
@@ -418,7 +483,10 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
   Future<void> _leave() async {
     await _leaveVoice();
     try {
-      await _c?.rpc('nx_room_leave', params: <String, dynamic>{'p_room': widget.roomId});
+      await _c?.rpc(
+        'nx_room_leave',
+        params: <String, dynamic>{'p_room': widget.roomId},
+      );
     } catch (_) {}
     if (mounted) Navigator.of(context).maybePop();
   }
@@ -441,12 +509,23 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
         appBar: AppBar(
           backgroundColor: Nx2.night.withValues(alpha: 0.9),
           foregroundColor: Nx2.text,
-          title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
-            Text(title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-            if (_room != null)
-              Text('${context.tx('کد', 'Code')} ${_room!['code']} · ${_members.length} ${context.tx('نفر', 'people')}',
-                  style: const TextStyle(fontSize: 11, color: Nx2.muted)),
-          ]),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 16,
+                ),
+              ),
+              if (_room != null)
+                Text(
+                  '${context.tx('کد', 'Code')} ${_room!['code']} · ${_members.length} ${context.tx('نفر', 'people')}',
+                  style: const TextStyle(fontSize: 11, color: Nx2.muted),
+                ),
+            ],
+          ),
           actions: <Widget>[
             IconButton(
               tooltip: context.tx('خروج از اتاق', 'Leave room'),
@@ -458,48 +537,63 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
         body: Container(
           decoration: const BoxDecoration(
             image: DecorationImage(
-                image: AssetImage(AnixAssets.sceneVoiceStage),
-                fit: BoxFit.cover,
-                colorFilter: ColorFilter.mode(Color(0xB307031A), BlendMode.darken)),
+              image: AssetImage(AnixAssets.sceneVoiceStage),
+              fit: BoxFit.cover,
+              colorFilter: ColorFilter.mode(
+                Color(0xB307031A),
+                BlendMode.darken,
+              ),
+            ),
           ),
           child: _error != null
               ? _errorView()
               : _room == null
-                  ? const Center(child: CircularProgressIndicator())
-                  : Column(children: <Widget>[
-                      _stage(),
-                      _tabs(),
-                      Expanded(
-                        child: switch (_tab) {
-                          1 => _membersList(),
-                          2 => _gamesPanel(),
-                          _ => _chat(),
-                        },
-                      ),
-                    ]),
+              ? const Center(child: CircularProgressIndicator())
+              : Column(
+                  children: <Widget>[
+                    _stage(),
+                    _tabs(),
+                    Expanded(
+                      child: switch (_tab) {
+                        1 => _membersList(),
+                        2 => _gamesPanel(),
+                        _ => _chat(),
+                      },
+                    ),
+                  ],
+                ),
         ),
       ),
     );
   }
 
   Widget _errorView() => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(mainAxisSize: MainAxisSize.min, children: <Widget>[
-            const Icon(Icons.wifi_off_rounded, color: Nx2.muted, size: 48),
-            const SizedBox(height: 10),
-            Text(
-                _error == 'offline'
-                    ? context.tx('برای اتاق‌ها باید وارد حساب شوی.', 'Sign in to use rooms.')
-                    : _error!,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Nx2.text)),
-          ]),
-        ),
-      );
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          const Icon(Icons.wifi_off_rounded, color: Nx2.muted, size: 48),
+          const SizedBox(height: 10),
+          Text(
+            _error == 'offline'
+                ? context.tx(
+                    'برای اتاق‌ها باید وارد حساب شوی.',
+                    'Sign in to use rooms.',
+                  )
+                : _error!,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Nx2.text),
+          ),
+        ],
+      ),
+    ),
+  );
 
   Widget _stage() {
-    final List<RoomMember> stage = _members.where((RoomMember m) => m.onStage).toList();
+    final List<RoomMember> stage = _members
+        .where((RoomMember m) => m.onStage)
+        .toList();
     final bool live = _voice != null;
     return Container(
       margin: const EdgeInsets.fromLTRB(10, 8, 10, 4),
@@ -509,84 +603,137 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: Nx2.violet.withValues(alpha: 0.5)),
       ),
-      child: Column(children: <Widget>[
-        Row(children: <Widget>[
-          Image.asset(AnixAssets.icon('mic'), width: 24, height: 24),
-          const SizedBox(width: 6),
-          Text(context.tx('صحنه‌ی صدا', 'Voice stage'),
-              style: const TextStyle(color: Nx2.text, fontWeight: FontWeight.w900)),
-          const Spacer(),
-          // Mic (mute / unmute) and speaker (on / off) are always visible with their state; using either while
-          // outside the call joins it first.
-          IconButton(
-            visualDensity: VisualDensity.compact,
-            tooltip: _mic
-                ? context.tx('میکروفون روشن (بی‌صدا کن)', 'Mic on (tap to mute)')
-                : context.tx('میکروفون خاموش', 'Mic muted'),
-            onPressed: _voiceBusy
-                ? null
-                : () async {
-                    if (!live) await _joinVoice();
-                    await _setMic(!_mic);
-                  },
-            icon: Icon(_mic ? Icons.mic_rounded : Icons.mic_off_rounded, color: _mic ? Nx2.success : Nx2.danger),
+      child: Column(
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Image.asset(AnixAssets.icon('mic'), width: 24, height: 24),
+              const SizedBox(width: 6),
+              Text(
+                context.tx('صحنه‌ی صدا', 'Voice stage'),
+                style: const TextStyle(
+                  color: Nx2.text,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const Spacer(),
+              // Mic (mute / unmute) and speaker (on / off) are always visible with their state; using either while
+              // outside the call joins it first.
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                tooltip: _mic
+                    ? context.tx(
+                        'میکروفون روشن (بی‌صدا کن)',
+                        'Mic on (tap to mute)',
+                      )
+                    : context.tx('میکروفون خاموش', 'Mic muted'),
+                onPressed: _voiceBusy
+                    ? null
+                    : () async {
+                        if (!live) await _joinVoice();
+                        await _setMic(!_mic);
+                      },
+                icon: Icon(
+                  _mic ? Icons.mic_rounded : Icons.mic_off_rounded,
+                  color: _mic ? Nx2.success : Nx2.danger,
+                ),
+              ),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                tooltip: _speaker
+                    ? context.tx('بلندگو روشن', 'Speaker on')
+                    : context.tx('بلندگو خاموش', 'Speaker off'),
+                onPressed: () => _setSpeaker(!_speaker),
+                icon: Icon(
+                  _speaker ? Icons.volume_up_rounded : Icons.volume_off_rounded,
+                  color: _speaker ? Nx2.success : Nx2.danger,
+                ),
+              ),
+              TextButton.icon(
+                onPressed: _voiceBusy
+                    ? null
+                    : (live ? _leaveVoice : _joinVoice),
+                icon: Icon(
+                  live ? Icons.call_end_rounded : Icons.headset_mic_rounded,
+                  color: live ? Nx2.danger : Nx2.cyan,
+                  size: 18,
+                ),
+                label: Text(
+                  _voiceBusy
+                      ? '…'
+                      : live
+                      ? context.tx('قطع صدا', 'Leave voice')
+                      : context.tx('ورود به صدا', 'Join voice'),
+                  style: TextStyle(
+                    color: live ? Nx2.danger : Nx2.cyan,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
           ),
-          IconButton(
-            visualDensity: VisualDensity.compact,
-            tooltip: _speaker ? context.tx('بلندگو روشن', 'Speaker on') : context.tx('بلندگو خاموش', 'Speaker off'),
-            onPressed: () => _setSpeaker(!_speaker),
-            icon: Icon(_speaker ? Icons.volume_up_rounded : Icons.volume_off_rounded,
-                color: _speaker ? Nx2.success : Nx2.danger),
+          if (_voiceError != null)
+            Text(
+              context.tx('اتصال صدا ممکن نشد', 'Voice could not connect'),
+              style: const TextStyle(color: Nx2.danger, fontSize: 11),
+            ),
+          SizedBox(
+            height: 70,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: stage.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              itemBuilder: (_, int i) {
+                final RoomMember m = stage[i];
+                final bool talking = _speaking(m.userId);
+                return SizedBox(
+                  width: 56,
+                  child: Column(
+                    children: <Widget>[
+                      Stack(
+                        clipBehavior: Clip.none,
+                        children: <Widget>[
+                          NxUserAvatar(
+                            avatar: m.avatar,
+                            name: m.name,
+                            size: 44,
+                            ring: talking
+                                ? Nx2.success
+                                : (m.isManager
+                                      ? Nx2.gold
+                                      : (_inVoice(m.userId) ? Nx2.cyan : null)),
+                          ),
+                          if (m.muted)
+                            const Positioned(
+                              right: -2,
+                              bottom: -2,
+                              child: Icon(
+                                Icons.mic_off_rounded,
+                                size: 14,
+                                color: Nx2.danger,
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        m.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Nx2.text,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
           ),
-          TextButton.icon(
-            onPressed: _voiceBusy ? null : (live ? _leaveVoice : _joinVoice),
-            icon: Icon(live ? Icons.call_end_rounded : Icons.headset_mic_rounded,
-                color: live ? Nx2.danger : Nx2.cyan, size: 18),
-            label: Text(
-                _voiceBusy
-                    ? '…'
-                    : live
-                        ? context.tx('قطع صدا', 'Leave voice')
-                        : context.tx('ورود به صدا', 'Join voice'),
-                style: TextStyle(color: live ? Nx2.danger : Nx2.cyan, fontWeight: FontWeight.w800)),
-          ),
-        ]),
-        if (_voiceError != null)
-          Text(context.tx('اتصال صدا ممکن نشد', 'Voice could not connect'),
-              style: const TextStyle(color: Nx2.danger, fontSize: 11)),
-        SizedBox(
-          height: 70,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: stage.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 10),
-            itemBuilder: (_, int i) {
-              final RoomMember m = stage[i];
-              final bool talking = _speaking(m.userId);
-              return SizedBox(
-                width: 56,
-                child: Column(children: <Widget>[
-                  Stack(clipBehavior: Clip.none, children: <Widget>[
-                    NxUserAvatar(
-                      avatar: m.avatar,
-                      name: m.name,
-                      size: 44,
-                      ring: talking ? Nx2.success : (m.isManager ? Nx2.gold : (_inVoice(m.userId) ? Nx2.cyan : null)),
-                    ),
-                    if (m.muted)
-                      const Positioned(right: -2, bottom: -2, child: Icon(Icons.mic_off_rounded, size: 14, color: Nx2.danger)),
-                  ]),
-                  const SizedBox(height: 3),
-                  Text(m.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Nx2.text, fontSize: 10, fontWeight: FontWeight.w700)),
-                ]),
-              );
-            },
-          ),
-        ),
-      ]),
+        ],
+      ),
     );
   }
 
@@ -599,107 +746,169 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 7),
             decoration: BoxDecoration(
-              border: Border(bottom: BorderSide(color: on ? Nx2.magenta : Colors.transparent, width: 3)),
+              border: Border(
+                bottom: BorderSide(
+                  color: on ? Nx2.magenta : Colors.transparent,
+                  width: 3,
+                ),
+              ),
             ),
-            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: <Widget>[
-              Image.asset(AnixAssets.icon(icon), width: 22, height: 22),
-              const SizedBox(width: 6),
-              Text(label,
-                  style: TextStyle(color: on ? Nx2.text : Nx2.muted, fontWeight: FontWeight.w800, fontSize: 13)),
-            ]),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                Image.asset(AnixAssets.icon(icon), width: 22, height: 22),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: on ? Nx2.text : Nx2.muted,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       );
     }
 
-    return Row(children: <Widget>[
-      tab(0, 'chat', context.tx('گفتگو', 'Chat')),
-      tab(1, 'friends', '${context.tx('اعضا', 'Members')} ${_members.length}'),
-      tab(2, 'gamepad', context.tx('بازی‌ها', 'Games')),
-    ]);
+    return Row(
+      children: <Widget>[
+        tab(0, 'chat', context.tx('گفتگو', 'Chat')),
+        tab(
+          1,
+          'friends',
+          '${context.tx('اعضا', 'Members')} ${_members.length}',
+        ),
+        tab(2, 'gamepad', context.tx('بازی‌ها', 'Games')),
+      ],
+    );
   }
 
   Widget _chat() {
-    final Map<String, RoomMember> byId = <String, RoomMember>{for (final RoomMember m in _members) m.userId: m};
-    return Column(children: <Widget>[
-      Expanded(
-        child: _messages.isEmpty
-            ? Center(
-                child: Text(context.tx('اولین پیام را بفرست 👋', 'Say hi 👋'),
-                    style: const TextStyle(color: Nx2.muted)))
-            : ListView.builder(
-                controller: _scroll,
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                itemCount: _messages.length,
-                itemBuilder: (_, int i) {
-                  final RoomMessage m = _messages[i];
-                  final bool mine = m.author == _me;
-                  final RoomMember? who = byId[m.author];
-                  final String name = who?.name ?? 'Pilot';
-                  final Widget bubble = Flexible(
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(vertical: 3),
-                      padding: const EdgeInsets.fromLTRB(10, 6, 10, 7),
-                      decoration: BoxDecoration(
-                        color: mine ? Nx2.violet.withValues(alpha: 0.55) : Nx2.night.withValues(alpha: 0.8),
-                        borderRadius: BorderRadius.circular(14),
+    final Map<String, RoomMember> byId = <String, RoomMember>{
+      for (final RoomMember m in _members) m.userId: m,
+    };
+    return Column(
+      children: <Widget>[
+        Expanded(
+          child: _messages.isEmpty
+              ? Center(
+                  child: Text(
+                    context.tx('اولین پیام را بفرست 👋', 'Say hi 👋'),
+                    style: const TextStyle(color: Nx2.muted),
+                  ),
+                )
+              : ListView.builder(
+                  controller: _scroll,
+                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                  itemCount: _messages.length,
+                  itemBuilder: (_, int i) {
+                    final RoomMessage m = _messages[i];
+                    final bool mine = m.author == _me;
+                    final RoomMember? who = byId[m.author];
+                    final String name = who?.name ?? 'Pilot';
+                    final Widget bubble = Flexible(
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(vertical: 3),
+                        padding: const EdgeInsets.fromLTRB(10, 6, 10, 7),
+                        decoration: BoxDecoration(
+                          color: mine
+                              ? Nx2.violet.withValues(alpha: 0.55)
+                              : Nx2.night.withValues(alpha: 0.8),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            if (!mine)
+                              Text(
+                                name,
+                                style: const TextStyle(
+                                  color: Nx2.cyan,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            Text(
+                              m.text,
+                              style: const TextStyle(
+                                color: Nx2.text,
+                                fontSize: 14,
+                              ),
+                            ),
+                            Text(
+                              '${m.at.hour.toString().padLeft(2, '0')}:${m.at.minute.toString().padLeft(2, '0')}',
+                              style: const TextStyle(
+                                color: Nx2.muted,
+                                fontSize: 9,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
-                        if (!mine)
-                          Text(name,
-                              style: const TextStyle(color: Nx2.cyan, fontSize: 11, fontWeight: FontWeight.w800)),
-                        Text(m.text, style: const TextStyle(color: Nx2.text, fontSize: 14)),
-                        Text(
-                            '${m.at.hour.toString().padLeft(2, '0')}:${m.at.minute.toString().padLeft(2, '0')}',
-                            style: const TextStyle(color: Nx2.muted, fontSize: 9)),
-                      ]),
-                    ),
-                  );
-                  return Row(
-                    mainAxisAlignment: mine ? MainAxisAlignment.end : MainAxisAlignment.start,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: <Widget>[
-                      if (!mine) ...<Widget>[NxUserAvatar(avatar: who?.avatar, name: name, size: 26), const SizedBox(width: 6)],
-                      bubble,
-                    ],
-                  );
-                },
-              ),
-      ),
-      SafeArea(
-        top: false,
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(10, 6, 6, 6),
-          color: Nx2.night.withValues(alpha: 0.92),
-          child: Row(children: <Widget>[
-            Expanded(
-              child: TextField(
-                controller: _input,
-                minLines: 1,
-                maxLines: 4,
-                maxLength: 4000,
-                textInputAction: TextInputAction.send,
-                onSubmitted: (_) => _send(),
-                style: const TextStyle(color: Nx2.text),
-                decoration: InputDecoration(
-                  counterText: '',
-                  hintText: context.tx('پیام…', 'Message…'),
-                  hintStyle: const TextStyle(color: Nx2.muted),
-                  filled: true,
-                  fillColor: Nx2.plum.withValues(alpha: 0.7),
-                  isDense: true,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(22), borderSide: BorderSide.none),
+                    );
+                    return Row(
+                      mainAxisAlignment: mine
+                          ? MainAxisAlignment.end
+                          : MainAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: <Widget>[
+                        if (!mine) ...<Widget>[
+                          NxUserAvatar(
+                            avatar: who?.avatar,
+                            name: name,
+                            size: 26,
+                          ),
+                          const SizedBox(width: 6),
+                        ],
+                        bubble,
+                      ],
+                    );
+                  },
                 ),
-              ),
-            ),
-            IconButton(
-              onPressed: _sending ? null : _send,
-              icon: const Icon(Icons.send_rounded, color: Nx2.magenta),
-            ),
-          ]),
         ),
-      ),
-    ]);
+        SafeArea(
+          top: false,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(10, 6, 6, 6),
+            color: Nx2.night.withValues(alpha: 0.92),
+            child: Row(
+              children: <Widget>[
+                Expanded(
+                  child: TextField(
+                    controller: _input,
+                    minLines: 1,
+                    maxLines: 4,
+                    maxLength: 4000,
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: (_) => _send(),
+                    style: const TextStyle(color: Nx2.text),
+                    decoration: InputDecoration(
+                      counterText: '',
+                      hintText: context.tx('پیام…', 'Message…'),
+                      hintStyle: const TextStyle(color: Nx2.muted),
+                      filled: true,
+                      fillColor: Nx2.plum.withValues(alpha: 0.7),
+                      isDense: true,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(22),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: _sending ? null : _send,
+                  icon: const Icon(Icons.send_rounded, color: Nx2.magenta),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _membersList() {
@@ -710,18 +919,30 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
           ListTile(
             dense: true,
             onTap: () => _showMember(m),
-            leading: NxUserAvatar(avatar: m.avatar, name: m.name, size: 34,
-                ring: _speaking(m.userId) ? Nx2.success : (m.isManager ? Nx2.gold : null)),
-            title: Text(m.name + (m.userId == _me ? context.tx(' (تو)', ' (you)') : ''),
-                style: const TextStyle(color: Nx2.text, fontWeight: FontWeight.w800)),
+            leading: NxUserAvatar(
+              avatar: m.avatar,
+              name: m.name,
+              size: 34,
+              ring: _speaking(m.userId)
+                  ? Nx2.success
+                  : (m.isManager ? Nx2.gold : null),
+            ),
+            title: Text(
+              m.name + (m.userId == _me ? context.tx(' (تو)', ' (you)') : ''),
+              style: const TextStyle(
+                color: Nx2.text,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
             subtitle: Text(
-                switch (m.role) {
-                  'manager' => context.tx('مدیر اتاق', 'Room manager'),
-                  'speaker' => context.tx('سخنران', 'Speaker'),
-                  _ => context.tx('شنونده', 'Listener'),
-                } +
-                    (m.muted ? context.tx(' · بی‌صدا', ' · muted') : ''),
-                style: const TextStyle(color: Nx2.muted, fontSize: 12)),
+              switch (m.role) {
+                    'manager' => context.tx('مدیر اتاق', 'Room manager'),
+                    'speaker' => context.tx('سخنران', 'Speaker'),
+                    _ => context.tx('شنونده', 'Listener'),
+                  } +
+                  (m.muted ? context.tx(' · بی‌صدا', ' · muted') : ''),
+              style: const TextStyle(color: Nx2.muted, fontSize: 12),
+            ),
             trailing: _isManager && m.userId != _me
                 ? PopupMenuButton<String>(
                     icon: const Icon(Icons.more_vert_rounded, color: Nx2.text),
@@ -729,20 +950,42 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
                       switch (a) {
                         case 'speaker':
                         case 'spectator':
-                          unawaited(_rpc('nx_room_set_role',
-                              <String, dynamic>{'p_room': widget.roomId, 'p_user': m.userId, 'p_role': a}));
+                          unawaited(
+                            _rpc('nx_room_set_role', <String, dynamic>{
+                              'p_room': widget.roomId,
+                              'p_user': m.userId,
+                              'p_role': a,
+                            }),
+                          );
                         case 'mute':
-                          unawaited(_rpc('nx_room_set_muted',
-                              <String, dynamic>{'p_room': widget.roomId, 'p_user': m.userId, 'p_muted': !m.muted}));
+                          unawaited(
+                            _rpc('nx_room_set_muted', <String, dynamic>{
+                              'p_room': widget.roomId,
+                              'p_user': m.userId,
+                              'p_muted': !m.muted,
+                            }),
+                          );
                       }
                     },
                     itemBuilder: (_) => <PopupMenuEntry<String>>[
                       if (m.role != 'speaker')
-                        PopupMenuItem<String>(value: 'speaker', child: Text(context.tx('سخنران کن', 'Make speaker'))),
+                        PopupMenuItem<String>(
+                          value: 'speaker',
+                          child: Text(context.tx('سخنران کن', 'Make speaker')),
+                        ),
                       if (m.role != 'spectator')
-                        PopupMenuItem<String>(value: 'spectator', child: Text(context.tx('شنونده کن', 'Make listener'))),
+                        PopupMenuItem<String>(
+                          value: 'spectator',
+                          child: Text(context.tx('شنونده کن', 'Make listener')),
+                        ),
                       PopupMenuItem<String>(
-                          value: 'mute', child: Text(m.muted ? context.tx('باصدا کن', 'Unmute') : context.tx('بی‌صدا کن', 'Mute'))),
+                        value: 'mute',
+                        child: Text(
+                          m.muted
+                              ? context.tx('باصدا کن', 'Unmute')
+                              : context.tx('بی‌صدا کن', 'Mute'),
+                        ),
+                      ),
                     ],
                   )
                 : null,
@@ -759,46 +1002,98 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
       builder: (BuildContext ctx) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
-          child: Column(mainAxisSize: MainAxisSize.min, children: <Widget>[
-            NxUserAvatar(avatar: m.avatar, name: m.name, size: 84, ring: m.isManager ? Nx2.gold : Nx2.violet),
-            const SizedBox(height: 8),
-            Text(m.name, style: const TextStyle(color: Nx2.text, fontSize: 18, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 12),
-            NovaFollowBar(uid: m.userId, self: m.userId == _me),
-            if (m.userId != _me)
-              TextButton.icon(
-                onPressed: () async {
-                  Navigator.pop(ctx);
-                  final TextEditingController t = TextEditingController();
-                  final bool? ok = await showDialog<bool>(
-                    context: context,
-                    builder: (BuildContext d) => AlertDialog(
-                      title: Text(context.tx('گزارش ${m.name}', 'Report ${m.name}')),
-                      content: TextField(controller: t, maxLength: 300,
-                          decoration: InputDecoration(hintText: context.tx('چه اتفاقی افتاد؟', 'What happened?'))),
-                      actions: <Widget>[
-                        TextButton(onPressed: () => Navigator.pop(d, false), child: Text(context.tx('انصراف', 'Cancel'))),
-                        FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(context.tx('ارسال', 'Send'))),
-                      ],
-                    ),
-                  );
-                  if (ok == true && t.text.trim().length >= 2) {
-                    try {
-                      await ref.read(onlineProvider).rpc('nx_report_user', <String, dynamic>{
-                        'p_target': m.userId, 'p_kind': 'room', 'p_target_id': widget.roomId, 'p_reason': t.text.trim(),
-                      });
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                            content: Text(context.tx('گزارش برای مدیران فرستاده شد', 'Report sent to the admins'))));
-                      }
-                    } catch (_) {}
-                  }
-                  t.dispose();
-                },
-                icon: const Icon(Icons.flag_rounded, color: Nx2.muted, size: 18),
-                label: Text(context.tx('گزارش تخلف', 'Report'), style: const TextStyle(color: Nx2.muted)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              NxUserAvatar(
+                avatar: m.avatar,
+                name: m.name,
+                size: 84,
+                ring: m.isManager ? Nx2.gold : Nx2.violet,
               ),
-          ]),
+              const SizedBox(height: 8),
+              Text(
+                m.name,
+                style: const TextStyle(
+                  color: Nx2.text,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 12),
+              NovaFollowBar(uid: m.userId, self: m.userId == _me),
+              if (m.userId != _me)
+                TextButton.icon(
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    final TextEditingController t = TextEditingController();
+                    final bool? ok = await showDialog<bool>(
+                      context: context,
+                      builder: (BuildContext d) => AlertDialog(
+                        title: Text(
+                          context.tx('گزارش ${m.name}', 'Report ${m.name}'),
+                        ),
+                        content: TextField(
+                          controller: t,
+                          maxLength: 300,
+                          decoration: InputDecoration(
+                            hintText: context.tx(
+                              'چه اتفاقی افتاد؟',
+                              'What happened?',
+                            ),
+                          ),
+                        ),
+                        actions: <Widget>[
+                          TextButton(
+                            onPressed: () => Navigator.pop(d, false),
+                            child: Text(context.tx('انصراف', 'Cancel')),
+                          ),
+                          FilledButton(
+                            onPressed: () => Navigator.pop(d, true),
+                            child: Text(context.tx('ارسال', 'Send')),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (ok == true && t.text.trim().length >= 2) {
+                      try {
+                        await ref.read(onlineProvider).rpc(
+                          'nx_report_user',
+                          <String, dynamic>{
+                            'p_target': m.userId,
+                            'p_kind': 'room',
+                            'p_target_id': widget.roomId,
+                            'p_reason': t.text.trim(),
+                          },
+                        );
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                context.tx(
+                                  'گزارش برای مدیران فرستاده شد',
+                                  'Report sent to the admins',
+                                ),
+                              ),
+                            ),
+                          );
+                        }
+                      } catch (_) {}
+                    }
+                    t.dispose();
+                  },
+                  icon: const Icon(
+                    Icons.flag_rounded,
+                    color: Nx2.muted,
+                    size: 18,
+                  ),
+                  label: Text(
+                    context.tx('گزارش تخلف', 'Report'),
+                    style: const TextStyle(color: Nx2.muted),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -809,52 +1104,88 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
     final GameInfo? g = gameById(_game);
     final bool playing = _room?['status'] == 'playing';
     final bool iAmPicked = _picked.containsKey(_me);
-    final int maxP = TalkRoomLimits.maxPlayersFor(_game), minP = TalkRoomLimits.minPlayersFor(_game);
+    final int maxP = TalkRoomLimits.maxPlayersFor(_game),
+        minP = TalkRoomLimits.minPlayersFor(_game);
     return ListView(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 24),
       children: <Widget>[
         Nx2Panel(
           padding: const EdgeInsets.all(12),
-          child: Row(children: <Widget>[
-            Image.asset('assets/arcade/pedestals/$_game.webp', width: 64, height: 64,
-                errorBuilder: (_, __, ___) => Image.asset(AnixAssets.icon('gamepad'), width: 48)),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
-                Text(g == null ? _game : context.tx(g.nameFa, g.nameEn),
-                    style: const TextStyle(color: Nx2.text, fontWeight: FontWeight.w900, fontSize: 16)),
-                Text(
-                    _game == 'finger_soccer'
-                        ? context.tx('۱ به ۱، ۲ به ۲ یا ۳ به ۳ — نوبت‌ها در هر تیم می‌چرخد',
-                            '1v1, 2v2 or 3v3 — turns rotate inside each side')
-                        : context.tx('$minP تا $maxP بازیکن', '$minP–$maxP players'),
-                    style: const TextStyle(color: Nx2.muted, fontSize: 12)),
-              ]),
-            ),
-            if (_isManager && !playing)
-              TextButton(onPressed: _pickGame, child: Text(context.tx('تغییر', 'Change'))),
-          ]),
+          child: Row(
+            children: <Widget>[
+              Image.asset(
+                'assets/arcade/pedestals/$_game.webp',
+                width: 64,
+                height: 64,
+                errorBuilder: (_, __, ___) =>
+                    Image.asset(AnixAssets.icon('gamepad'), width: 48),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      g == null ? _game : context.tx(g.nameFa, g.nameEn),
+                      style: const TextStyle(
+                        color: Nx2.text,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                      ),
+                    ),
+                    Text(
+                      _game == 'finger_soccer'
+                          ? context.tx(
+                              '۱ به ۱، ۲ به ۲ یا ۳ به ۳ — نوبت‌ها در هر تیم می‌چرخد',
+                              '1v1, 2v2 or 3v3 — turns rotate inside each side',
+                            )
+                          : context.tx(
+                              '$minP تا $maxP بازیکن',
+                              '$minP–$maxP players',
+                            ),
+                      style: const TextStyle(color: Nx2.muted, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              if (_isManager && !playing)
+                TextButton(
+                  onPressed: _pickGame,
+                  child: Text(context.tx('تغییر', 'Change')),
+                ),
+            ],
+          ),
         ),
         const SizedBox(height: 10),
         if (playing)
           Nx2Panel(
             padding: const EdgeInsets.all(14),
-            child: Row(children: <Widget>[
-              Image.asset(AnixAssets.icon('versus'), width: 36),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(context.tx('بازی در جریان است. بعد از پایان همه به اتاق برمی‌گردند.',
-                    'A match is on. Everyone returns to the room when it ends.'),
-                    style: const TextStyle(color: Nx2.text)),
-              ),
-              if (iAmPicked && _room?['match_id'] != null)
-                TextButton(
-                    onPressed: () => _openMatch('${_room!['match_id']}'), child: Text(context.tx('ورود', 'Rejoin'))),
-            ]),
+            child: Row(
+              children: <Widget>[
+                Image.asset(AnixAssets.icon('versus'), width: 36),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    context.tx(
+                      'بازی در جریان است. بعد از پایان همه به اتاق برمی‌گردند.',
+                      'A match is on. Everyone returns to the room when it ends.',
+                    ),
+                    style: const TextStyle(color: Nx2.text),
+                  ),
+                ),
+                if (iAmPicked && _room?['match_id'] != null)
+                  TextButton(
+                    onPressed: () => _openMatch('${_room!['match_id']}'),
+                    child: Text(context.tx('ورود', 'Rejoin')),
+                  ),
+              ],
+            ),
           )
         else ...<Widget>[
           Nx2SectionHeader(
-              title: '${context.tx('بازیکن‌ها', 'Players')} ${_picked.length}/$maxP'),
+            title:
+                '${context.tx('بازیکن‌ها', 'Players')} ${_picked.length}/$maxP',
+          ),
           const SizedBox(height: 4),
           for (final RoomMember m in _members)
             CheckboxListTile(
@@ -864,26 +1195,51 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
                   ? null
                   : (bool? on) {
                       final List<String> ids = <String>[
-                        for (final MapEntry<String, Map<String, dynamic>> e in (_picked.entries.toList()
-                          ..sort((MapEntry<String, Map<String, dynamic>> a, MapEntry<String, Map<String, dynamic>> b) =>
-                              ((a.value['seat'] as num?) ?? 0).compareTo((b.value['seat'] as num?) ?? 0))))
-                          e.key
+                        for (final MapEntry<String, Map<String, dynamic>> e
+                            in (_picked.entries.toList()..sort(
+                              (
+                                MapEntry<String, Map<String, dynamic>> a,
+                                MapEntry<String, Map<String, dynamic>> b,
+                              ) => ((a.value['seat'] as num?) ?? 0).compareTo(
+                                (b.value['seat'] as num?) ?? 0,
+                              ),
+                            )))
+                          e.key,
                       ];
                       if (on == true) {
                         if (ids.length >= maxP) {
-                          _snack(context.tx('حداکثر $maxP بازیکن', 'At most $maxP players'));
+                          _snack(
+                            context.tx(
+                              'حداکثر $maxP بازیکن',
+                              'At most $maxP players',
+                            ),
+                          );
                           return;
                         }
                         ids.add(m.userId);
                       } else {
                         ids.remove(m.userId);
                       }
-                      unawaited(_rpc('nx_room_select_players', <String, dynamic>{'p_room': widget.roomId, 'p_users': ids}));
+                      unawaited(
+                        _rpc('nx_room_select_players', <String, dynamic>{
+                          'p_room': widget.roomId,
+                          'p_users': ids,
+                        }),
+                      );
                     },
               secondary: NxUserAvatar(avatar: m.avatar, name: m.name, size: 30),
-              title: Text(m.name, style: const TextStyle(color: Nx2.text, fontWeight: FontWeight.w700)),
+              title: Text(
+                m.name,
+                style: const TextStyle(
+                  color: Nx2.text,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
               subtitle: _picked.containsKey(m.userId)
-                  ? Text(_seatLabel(_picked[m.userId]!), style: const TextStyle(color: Nx2.cyan, fontSize: 11))
+                  ? Text(
+                      _seatLabel(_picked[m.userId]!),
+                      style: const TextStyle(color: Nx2.cyan, fontSize: 11),
+                    )
                   : null,
             ),
           if (_isManager && _game == 'finger_soccer' && _picked.length >= 2)
@@ -893,11 +1249,23 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
                 key: const ValueKey<String>('fs-swap-sides'),
                 // The new seats go to the server (nx_room_select_players) and reach every member's room view; the
                 // match is built from these seats, so it starts with the sides swapped on every phone.
-                onPressed: () => unawaited(_rpc('nx_room_select_players',
-                    <String, dynamic>{'p_room': widget.roomId, 'p_users': fsSwapSides(_pickedBySeat())})),
+                onPressed: () => unawaited(
+                  _rpc('nx_room_select_players', <String, dynamic>{
+                    'p_room': widget.roomId,
+                    'p_users': fsSwapSides(_pickedBySeat()),
+                  }),
+                ),
                 icon: const Icon(Icons.swap_horiz_rounded, color: Nx2.cyan),
-                label: Text(context.tx('جابه‌جایی تیم ۱ و تیم ۲', 'Swap Team 1 and Team 2'),
-                    style: const TextStyle(color: Nx2.cyan, fontWeight: FontWeight.w800)),
+                label: Text(
+                  context.tx(
+                    'جابه‌جایی تیم ۱ و تیم ۲',
+                    'Swap Team 1 and Team 2',
+                  ),
+                  style: const TextStyle(
+                    color: Nx2.cyan,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ),
             ),
           const SizedBox(height: 8),
@@ -914,12 +1282,18 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
             )
           else
             Text(
-                iAmPicked
-                    ? context.tx('انتخاب شدی! تیم و چیدمانت را بچین؛ مدیر بازی را شروع می‌کند.',
-                        'You are in! Pick your team and formation; the manager starts the match.')
-                    : context.tx('مدیر اتاق بازی و بازیکن‌ها را انتخاب می‌کند.', 'The room manager picks the game and players.'),
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Nx2.muted)),
+              iAmPicked
+                  ? context.tx(
+                      'انتخاب شدی! تیم و چیدمانت را بچین؛ مدیر بازی را شروع می‌کند.',
+                      'You are in! Pick your team and formation; the manager starts the match.',
+                    )
+                  : context.tx(
+                      'مدیر اتاق بازی و بازیکن‌ها را انتخاب می‌کند.',
+                      'The room manager picks the game and players.',
+                    ),
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Nx2.muted),
+            ),
         ],
       ],
     );
@@ -927,11 +1301,17 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
 
   /// Picked players' ids in seat order.
   List<String> _pickedBySeat() => <String>[
-        for (final MapEntry<String, Map<String, dynamic>> e in (_picked.entries.toList()
-          ..sort((MapEntry<String, Map<String, dynamic>> a, MapEntry<String, Map<String, dynamic>> b) =>
-              ((a.value['seat'] as num?) ?? 0).compareTo((b.value['seat'] as num?) ?? 0))))
-          e.key
-      ];
+    for (final MapEntry<String, Map<String, dynamic>> e
+        in (_picked.entries.toList()..sort(
+          (
+            MapEntry<String, Map<String, dynamic>> a,
+            MapEntry<String, Map<String, dynamic>> b,
+          ) => ((a.value['seat'] as num?) ?? 0).compareTo(
+            (b.value['seat'] as num?) ?? 0,
+          ),
+        )))
+      e.key,
+  ];
 
   String _seatLabel(Map<String, dynamic> p) {
     final int seat = (p['seat'] as num?)?.toInt() ?? 0;
@@ -944,18 +1324,32 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
 
   Future<void> _start(int minP) async {
     if (_picked.length < minP) {
-      _snack(context.tx('حداقل $minP بازیکن انتخاب کن', 'Pick at least $minP players'));
+      _snack(
+        context.tx(
+          'حداقل $minP بازیکن انتخاب کن',
+          'Pick at least $minP players',
+        ),
+      );
       return;
     }
     if (_game == 'finger_soccer' && _picked.length.isOdd) {
-      _snack(context.tx('فوتبال انگشتی: تعداد بازیکن‌ها زوج باشد (۱×۱، ۲×۲، ۳×۳)', 'Finger soccer needs 2, 4 or 6 players'));
+      _snack(
+        context.tx(
+          'فوتبال انگشتی: تعداد بازیکن‌ها زوج باشد (۱×۱، ۲×۲، ۳×۳)',
+          'Finger soccer needs 2, 4 or 6 players',
+        ),
+      );
       return;
     }
-    await _rpc('nx_start_room_match', <String, dynamic>{'p_room': widget.roomId});
+    await _rpc('nx_start_room_match', <String, dynamic>{
+      'p_room': widget.roomId,
+    });
   }
 
   Future<void> _pickGame() async {
-    final List<GameInfo> games = kGames.where((GameInfo g) => g.supportsOnline).toList();
+    final List<GameInfo> games = kGames
+        .where((GameInfo g) => g.supportsOnline)
+        .toList();
     final GameInfo? g = await showModalBottomSheet<GameInfo>(
       context: context,
       backgroundColor: Nx2.night,
@@ -967,23 +1361,39 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
             for (final GameInfo g in games)
               InkWell(
                 onTap: () => Navigator.of(ctx).pop(g),
-                child: Column(children: <Widget>[
-                  Expanded(
-                    child: Image.asset('assets/arcade/pedestals/${g.id}.webp',
-                        errorBuilder: (_, __, ___) => const Icon(Icons.sports_esports_rounded, color: Nx2.text)),
-                  ),
-                  Text(ctx.tx(g.nameFa, g.nameEn),
+                child: Column(
+                  children: <Widget>[
+                    Expanded(
+                      child: Image.asset(
+                        'assets/arcade/pedestals/${g.id}.webp',
+                        errorBuilder: (_, __, ___) => const Icon(
+                          Icons.sports_esports_rounded,
+                          color: Nx2.text,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      ctx.tx(g.nameFa, g.nameEn),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Nx2.text, fontSize: 12, fontWeight: FontWeight.w700)),
-                ]),
+                      style: const TextStyle(
+                        color: Nx2.text,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
               ),
           ],
         ),
       ),
     );
     if (g == null) return;
-    await _rpc('nx_room_change_game', <String, dynamic>{'p_room': widget.roomId, 'p_game': g.id});
+    await _rpc('nx_room_change_game', <String, dynamic>{
+      'p_room': widget.roomId,
+      'p_game': g.id,
+    });
   }
 
   Map<String, dynamic> get _myPrefs {
@@ -998,112 +1408,187 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
     final String team = '${pr['team'] ?? ''}';
     final int form = (pr['form'] as num?)?.toInt() ?? 0;
     Future<void> save(Map<String, dynamic> patch) =>
-        _rpc('nx_room_set_prefs', <String, dynamic>{'p_room': widget.roomId, 'p_prefs': <String, dynamic>{...pr, ...patch}});
+        _rpc('nx_room_set_prefs', <String, dynamic>{
+          'p_room': widget.roomId,
+          'p_prefs': <String, dynamic>{...pr, ...patch},
+        });
     if (team.isEmpty && !_fsTeamSeeded) {
       _fsTeamSeeded = true;
-      unawaited(SharedPreferences.getInstance().then((SharedPreferences p) {
-        final String? t = p.getString('bm.team');
-        if (t != null && kBmTeams.any((BmTeam x) => x.id == t) && GemShop.instance.ownsTeam(t) && mounted) {
-          return save(<String, dynamic>{'team': t});
-        }
-        return null;
-      }).catchError((Object _) => null));
+      unawaited(
+        SharedPreferences.getInstance()
+            .then((SharedPreferences p) {
+              final String? t = p.getString('bm.team');
+              if (t != null &&
+                  kBmTeams.any((BmTeam x) => x.id == t) &&
+                  GemShop.instance.ownsTeam(t) &&
+                  mounted) {
+                return save(<String, dynamic>{'team': t});
+              }
+              return null;
+            })
+            .catchError((Object _) => null),
+      );
     }
     return Nx2Panel(
       padding: const EdgeInsets.all(12),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
-        Text(context.tx('ترکیب من', 'My line-up'),
-            style: const TextStyle(color: Nx2.text, fontWeight: FontWeight.w900)),
-        if (!captain)
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
           Text(
-              context.tx('در بازی تیمی، تیم و چیدمان را کاپیتان هر طرف (اولین بازیکن) تعیین می‌کند؛ انتخاب تو به‌عنوان پیشنهاد ذخیره می‌شود.',
-                  'In team games each side plays its captain’s (first player’s) team and formation; yours is saved as a suggestion.'),
-              style: const TextStyle(color: Nx2.muted, fontSize: 11)),
-        const SizedBox(height: 6),
-        for (final List<Object> cat in kBmCats) ...<Widget>[
-          Text(context.tx('${cat[2]}', '${cat[1]}'),
-              style: const TextStyle(color: Nx2.gold, fontSize: 12, fontWeight: FontWeight.w800)),
-          SizedBox(
-            height: 64,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: <Widget>[
-                for (final BmTeam t in kBmTeams.where((BmTeam t) => t.cat == cat[0]))
-                  GestureDetector(
-                    // Locked teams (not bought with gems) can't be picked here; buy them in the game / shop.
-                    onTap: () {
-                      if (!GemShop.instance.ownsTeam(t.id)) {
-                        _snack(context.tx('این تیم قفل است (${GemShop.instance.teamPrice(t.id)} الماس) — از فروشگاه بخرش.',
-                            'Locked team (${GemShop.instance.teamPrice(t.id)} gems) — buy it in the shop.'));
-                        return;
-                      }
-                      unawaited(save(<String, dynamic>{'team': t.id}));
-                    },
-                    child: Container(
-                      width: 56,
-                      margin: const EdgeInsets.only(right: 6, top: 4),
-                      padding: const EdgeInsets.all(3),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: team == t.id ? Nx2.magenta : Colors.white24, width: team == t.id ? 2.5 : 1),
-                      ),
-                      child: Opacity(
-                        opacity: GemShop.instance.ownsTeam(t.id) ? 1 : .4,
-                        child: Image.asset(t.asset, fit: BoxFit.contain, cacheWidth: 140,
-                            errorBuilder: (_, __, ___) => Center(
-                                child: Text(t.name, style: const TextStyle(color: Nx2.text, fontSize: 9)))),
-                      ),
-                    ),
-                  ),
-              ],
+            context.tx('ترکیب من', 'My line-up'),
+            style: const TextStyle(
+              color: Nx2.text,
+              fontWeight: FontWeight.w900,
             ),
           ),
-        ],
-        const SizedBox(height: 6),
-        Wrap(spacing: 6, runSpacing: 6, children: <Widget>[
-          for (int i = 0; i < kBmForms.length; i++)
-            ChoiceChip(
-              label: Text(kBmForms[i].fa),
-              selected: form == i && pr.containsKey('form'),
-              onSelected: (_) => unawaited(save(<String, dynamic>{'form': i})),
+          if (!captain)
+            Text(
+              context.tx(
+                'در بازی تیمی، تیم و چیدمان را کاپیتان هر طرف (اولین بازیکن) تعیین می‌کند؛ انتخاب تو به‌عنوان پیشنهاد ذخیره می‌شود.',
+                'In team games each side plays its captain’s (first player’s) team and formation; yours is saved as a suggestion.',
+              ),
+              style: const TextStyle(color: Nx2.muted, fontSize: 11),
             ),
-        ]),
-      ]),
+          const SizedBox(height: 6),
+          for (final List<Object> cat in kBmCats) ...<Widget>[
+            Text(
+              context.tx('${cat[2]}', '${cat[1]}'),
+              style: const TextStyle(
+                color: Nx2.gold,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            SizedBox(
+              height: 64,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: <Widget>[
+                  for (final BmTeam t in kBmTeams.where(
+                    (BmTeam t) => t.cat == cat[0],
+                  ))
+                    GestureDetector(
+                      // Locked teams (not bought with gems) can't be picked here; buy them in the game / shop.
+                      onTap: () {
+                        if (!GemShop.instance.ownsTeam(t.id)) {
+                          _snack(
+                            context.tx(
+                              'این تیم قفل است (${GemShop.instance.teamPrice(t.id)} الماس) — از فروشگاه بخرش.',
+                              'Locked team (${GemShop.instance.teamPrice(t.id)} gems) — buy it in the shop.',
+                            ),
+                          );
+                          return;
+                        }
+                        unawaited(save(<String, dynamic>{'team': t.id}));
+                      },
+                      child: Container(
+                        width: 56,
+                        margin: const EdgeInsets.only(right: 6, top: 4),
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: team == t.id ? Nx2.magenta : Colors.white24,
+                            width: team == t.id ? 2.5 : 1,
+                          ),
+                        ),
+                        child: Opacity(
+                          opacity: GemShop.instance.ownsTeam(t.id) ? 1 : .4,
+                          child: Image.asset(
+                            t.asset,
+                            fit: BoxFit.contain,
+                            cacheWidth: 140,
+                            errorBuilder: (_, __, ___) => Center(
+                              child: Text(
+                                t.name,
+                                style: const TextStyle(
+                                  color: Nx2.text,
+                                  fontSize: 9,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: <Widget>[
+              for (int i = 0; i < kBmForms.length; i++)
+                ChoiceChip(
+                  label: Text(kBmForms[i].fa),
+                  selected: form == i && pr.containsKey('form'),
+                  onSelected: (_) =>
+                      unawaited(save(<String, dynamic>{'form': i})),
+                ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
   Widget _arenaSetup() {
-    final Map<String, dynamic> st = Map<String, dynamic>.from((_room?['settings'] as Map?) ?? const <String, dynamic>{});
-    final int field = bmFieldIndex((st['field'] as num?)?.toInt()), ball = bmBallIndex((st['ball'] as num?)?.toInt());
+    final Map<String, dynamic> st = Map<String, dynamic>.from(
+      (_room?['settings'] as Map?) ?? const <String, dynamic>{},
+    );
+    final int field = bmFieldIndex((st['field'] as num?)?.toInt()),
+        ball = bmBallIndex((st['ball'] as num?)?.toInt());
     final bool fa = context.isFa;
-    Future<void> save(Map<String, dynamic> patch) =>
-        _rpc('nx_room_set_settings', <String, dynamic>{'p_room': widget.roomId, 'p_settings': patch});
+    Future<void> save(Map<String, dynamic> patch) => _rpc(
+      'nx_room_set_settings',
+      <String, dynamic>{'p_room': widget.roomId, 'p_settings': patch},
+    );
     return Padding(
       padding: const EdgeInsets.only(top: 8),
       child: Nx2Panel(
         padding: const EdgeInsets.all(12),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
-          Text(context.tx('زمین و توپ (مدیر)', 'Pitch & ball (manager)'),
-              style: const TextStyle(color: Nx2.text, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 6),
-          Wrap(spacing: 6, runSpacing: 6, children: <Widget>[
-            for (int i = 0; i < kBmFieldsRaw.length; i++)
-              ChoiceChip(
-                label: Text(kBmFieldsRaw[i].name),
-                selected: field == i,
-                onSelected: (_) => unawaited(save(<String, dynamic>{'field': i})),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              context.tx('زمین و توپ (مدیر)', 'Pitch & ball (manager)'),
+              style: const TextStyle(
+                color: Nx2.text,
+                fontWeight: FontWeight.w900,
               ),
-          ]),
-          const SizedBox(height: 8),
-          Wrap(spacing: 6, runSpacing: 6, children: <Widget>[
-            for (int i = 0; i < NB; i++)
-              ChoiceChip(
-                label: Text(fa ? kBmBallFa[i] : kBmBallN[i]),
-                selected: ball == i,
-                onSelected: (_) => unawaited(save(<String, dynamic>{'ball': i})),
-              ),
-          ]),
-        ]),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: <Widget>[
+                for (int i = 0; i < kBmFieldsRaw.length; i++)
+                  ChoiceChip(
+                    label: Text(kBmFieldsRaw[i].name),
+                    selected: field == i,
+                    onSelected: (_) =>
+                        unawaited(save(<String, dynamic>{'field': i})),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: <Widget>[
+                for (int i = 0; i < NB; i++)
+                  ChoiceChip(
+                    label: Text(fa ? kBmBallFa[i] : kBmBallN[i]),
+                    selected: ball == i,
+                    onSelected: (_) =>
+                        unawaited(save(<String, dynamic>{'ball': i})),
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

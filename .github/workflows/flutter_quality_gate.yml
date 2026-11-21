@@ -1,0 +1,44 @@
+name: ANIX PRO Flutter Quality Gate
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flutter-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: subosito/flutter-action@v2.23.0
+        with:
+          flutter-version: '3.50.0'
+          channel: stable
+          cache: true
+          cache-dependency-path: pubspec.lock
+
+      - name: Install locked dependencies
+        run: flutter pub get --enforce-lockfile
+
+      - name: Analyze
+        run: |
+          set -o pipefail
+          flutter analyze 2>&1 | tee analyze.txt
+        shell: bash
+
+      - name: Upload analyzer report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: anix-pro-analyze-${{ github.sha }}
+          path: |
+            analyze.txt
+          if-no-files-found: warn
+          retention-days: 14
