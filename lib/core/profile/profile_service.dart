@@ -300,8 +300,9 @@ class ProfileService extends ChangeNotifier {
     }
     if (serverName != null &&
         serverName.isNotEmpty &&
-        (replace || username.isEmpty))
+        (replace || username.isEmpty)) {
       username = serverName;
+    }
     if (avatar != null && avatar.isNotEmpty && replace) avatarCore = avatar;
     (j['equipped'] as Map?)?.forEach(
       (k, v) => equipped.putIfAbsent('$k', () => '$v'),
@@ -550,8 +551,9 @@ class ProfileService extends ChangeNotifier {
     _xpToday += allowed;
     this.coins += coins;
     bump('event.$event');
-    if (fa != null || en != null)
+    if (fa != null || en != null) {
       _log(event, fa ?? en ?? event, en ?? fa ?? event, xp: allowed);
+    }
     if (allowed > 0 || coins > 0) {
       cloudQueue?.call(<String, dynamic>{
         't': 'award',

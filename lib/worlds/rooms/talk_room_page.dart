@@ -216,10 +216,12 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
 
   void _addMessage(Map<String, dynamic> r) {
     final String id = '${r['id']}';
-    if (r['deleted'] == true || _messages.any((RoomMessage m) => m.id == id))
+    if (r['deleted'] == true || _messages.any((RoomMessage m) => m.id == id)) {
       return;
-    if (_joined && '${r['author']}' != _me && _messages.isNotEmpty)
+    }
+    if (_joined && '${r['author']}' != _me && _messages.isNotEmpty) {
       NxSfx.instance.play('chat', gain: 0.7);
+    }
     _messages.add(
       RoomMessage(
         id,
@@ -282,8 +284,9 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
           .order('seat');
       if (!mounted) return;
       final int before = _members.length;
-      if (before > 0 && mem.length != before)
+      if (before > 0 && mem.length != before) {
         NxSfx.instance.play(mem.length > before ? 'join' : 'leave', gain: 0.6);
+      }
       setState(() {
         _room = room;
         _members = mem.map((dynamic r) {
@@ -316,8 +319,9 @@ class _TalkRoomPageState extends ConsumerState<TalkRoomPage> {
         r['status'] != 'playing' ||
         mid == null ||
         _inMatch ||
-        mid == _lastMatch)
+        mid == _lastMatch) {
       return;
+    }
     if (!_picked.containsKey(_me)) return;
     unawaited(_openMatch(mid));
   }

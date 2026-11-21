@@ -303,8 +303,9 @@ class _OnlineMatchPageState extends ConsumerState<OnlineMatchPage>
       NxSfx.instance.play(settled.outcome == GameOutcome.win ? 'win' : 'lose');
     }
     unawaited(ref.read(cloudSyncProvider).refreshWallet());
-    if (widget.tournamentMatchId != null)
+    if (widget.tournamentMatchId != null) {
       unawaited(_reportTournament(settled, link));
+    }
     await Future<void>.delayed(Duration(milliseconds: settled.holdMs ?? 900));
     if (mounted) setState(() => _result = settled);
   }
