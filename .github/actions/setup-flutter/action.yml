@@ -8,7 +8,7 @@ runs:
         flutter-version: '3.50.0'
         channel: stable
         cache: true
-        cache-dependency-path: pubspec.lock
+        cache-key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.lock') }}
     - name: Install locked dependencies
       shell: bash
       run: flutter pub get --enforce-lockfile
