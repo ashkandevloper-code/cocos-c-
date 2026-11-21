@@ -1,7 +1,15 @@
 name: ANIX PRO Android Build
 
 on:
-  # Invoked only by full_release_validation after all required quality gates pass.
+  # Direct diagnostic build; publication remains disabled without a validated release tag.
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Optional release tag; leave empty for a validation build only.
+        required: false
+        type: string
+        default: ''
+  # Invoked by full_release_validation after all required quality gates pass.
   workflow_call:
     inputs:
       release_tag:
