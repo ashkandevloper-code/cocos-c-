@@ -266,6 +266,7 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
           log = Path('test.txt')
           if not log.exists():
               print('::error title=Flutter tests::No test log was produced')
@@ -276,8 +277,11 @@ jobs:
               failures = [max(0, len(lines)-35)]
           for n, i in enumerate(failures[:8], 1):
               # Flutter's widget-test exceptions are printed BEFORE its final
-              # '[E]' line (other concurrent tests may interleave here).
-              chunk = ' | '.join(lines[max(0, i-65):i+7])[-10000:]
+              # '[E]' line. Strip concurrent suites' progress lines; GitHub
+              # truncates check annotations at ~4K bytes from the END.
+              excerpt = [s for s in lines[max(0, i-200):i+7]
+                         if not re.match(r'^\d\d:\d\d \+', s) or '[E]' in s]
+              chunk = ' | '.join(excerpt)[-3500:]
               # Actions command syntax must not be injectable from test output.
               chunk = chunk.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A').replace('::', ': :')
               print(f'::error title=Flutter test failure {n}::{chunk}')
