@@ -34,6 +34,20 @@ jobs:
           if [ ! -d android ]; then
             flutter create --platforms=android --org com.nexora --project-name nexora .
           fi
+          python3 - <<'PY'
+          import glob
+          for path in glob.glob('android/app/build.gradle*'):
+              text = open(path, encoding='utf-8').read()
+              if 'coreLibraryDesugaring' in text:
+                  continue
+              if path.endswith('.kts'):
+                  text = text.replace('compileOptions {', 'compileOptions {\n        isCoreLibraryDesugaringEnabled = true', 1)
+                  text += '\ndependencies {\n    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")\n}\n'
+              else:
+                  text = text.replace('compileOptions {', 'compileOptions {\n        coreLibraryDesugaringEnabled true', 1)
+                  text += "\ndependencies {\n    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'\n}\n"
+              open(path, 'w', encoding='utf-8').write(text)
+          PY
       - name: Install dependencies
         run: flutter pub get
       - name: Build debug APK
