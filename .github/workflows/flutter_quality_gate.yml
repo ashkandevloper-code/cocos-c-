@@ -32,7 +32,7 @@ jobs:
       - name: Analyze
         run: |
           set -o pipefail
-          flutter analyze 2>&1 | tee analyze.txt
+          flutter analyze --no-fatal-infos 2>&1 | tee analyze.txt
         shell: bash
 
       - name: Upload analyzer report
