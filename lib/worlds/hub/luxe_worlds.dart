@@ -3,8 +3,17 @@ import 'package:flutter/material.dart';
 import '../../core/assets/app_assets.dart';
 import '../../games/game_registry.dart';
 
-/// One destination inside a Station world. Every item opens a real, existing screen
+/// ANIX PRO information architecture (Station Luxe). Every item opens a real, existing screen or a real in-app action
 /// (no "coming soon" tiles): [route] is a go_router location, [action] a named in-app action.
+///
+///   Dock:  Home · Social · PLAY · Compete · Profile
+///   Games    Sports · Table · Cards & party · Online (rooms + voice)
+///   Social   Messages · Feed & stories · Communities
+///   Compete  Tournaments · Join by code · Invitations · Create · Rankings
+///   Rewards  Daily · Missions · Achievements (only here, not in the profile)
+///   Shop     Teams & gems · Custom team · Cosmetics · History
+///   Oracle   ORACLE AI
+///   Profile  Profile · Account · Settings · Admin (staff only)
 class LuxeItem {
   const LuxeItem({
     required this.fa,
@@ -14,21 +23,28 @@ class LuxeItem {
     this.image,
     this.route,
     this.action,
-    this.rarity = 2,
+    this.subFa,
+    this.subEn,
+    this.staffOnly = false,
+    this.online = false,
   });
   final String fa;
   final String en;
+  final String? subFa;
+  final String? subEn;
   final int tab;
   final String? icon; // assets/luxe/icons/<icon>.webp
   final String? image; // full asset path (game pedestals)
   final String? route;
   final String? action; // 'daily' = claim today's reward
-  final int rarity;
+  final bool staffOnly;
+  final bool online;
 }
 
 class LuxeWorld {
   const LuxeWorld({
     required this.k,
+    required this.route,
     required this.fa,
     required this.en,
     required this.icon,
@@ -40,6 +56,9 @@ class LuxeWorld {
     required this.items,
   });
   final String k;
+
+  /// The canonical location of this station (dock / hub carousel target).
+  final String route;
   final String fa;
   final String en;
   final String icon;
@@ -51,42 +70,72 @@ class LuxeWorld {
   final List<LuxeItem> items;
 }
 
-const List<String> _sport = <String>[
-  'finger_soccer', 'basketball_battle', 'mini_golf', 'kart_racing', 'obstacle_race', 'bomb_arena'
-];
-const List<String> _table = <String>['billiards', 'pool8', 'carrom', 'backgammon', 'ludo', 'snakes_ladders'];
-const List<String> _party = <String>['uno', 'mafia', 'spy_mafia', 'quiz'];
+/// Games category of a registered game: 0 sports & action, 1 table, 2 cards & party.
+int luxeGameCategory(GameInfo g) {
+  const Map<String, int> fixed = <String, int>{
+    'finger_soccer': 0,
+    'basketball_battle': 0,
+    'mini_golf': 0,
+    'kart_racing': 0,
+    'obstacle_race': 0,
+    'bomb_arena': 0,
+    'billiards': 1,
+    'pool8': 1,
+    'carrom': 1,
+    'backgammon': 1,
+    'ludo': 1,
+    'snakes_ladders': 1,
+    'uno': 2,
+    'mafia': 2,
+    'spy_mafia': 2,
+    'quiz': 2,
+  };
+  final int? f = fixed[g.id];
+  if (f != null) return f;
+  return switch (g.group) { 2 => 1, 3 => 2, _ => 0 };
+}
 
 List<LuxeItem> _gameItems() {
-  final List<LuxeItem> out = <LuxeItem>[];
-  final Set<String> placed = <String>{};
-  void add(List<String> ids, int tab) {
-    for (final String id in ids) {
-      final GameInfo? g = gameById(id);
-      if (g == null) continue;
-      placed.add(id);
-      out.add(LuxeItem(
+  final List<LuxeItem> out = <LuxeItem>[
+    for (final GameInfo g in kGames)
+      LuxeItem(
           fa: g.nameFa,
           en: g.nameEn,
-          tab: tab,
-          image: AppAssets.pedestal(id),
-          route: '/arcade/$id',
-          rarity: g.supportsOnline ? 4 : 3));
-    }
-  }
-
-  add(_sport, 0);
-  add(_table, 1);
-  add(_party, 2);
-  // Any game registered later still shows up (never silently dropped from the menu).
-  for (final GameInfo g in kGames) {
-    if (placed.contains(g.id)) continue;
-    out.add(LuxeItem(fa: g.nameFa, en: g.nameEn, tab: 2, image: AppAssets.pedestal(g.id), route: '/arcade/${g.id}'));
-  }
+          subFa: g.taglineFa,
+          subEn: g.taglineEn,
+          tab: luxeGameCategory(g),
+          image: AppAssets.pedestal(g.id),
+          route: '/arcade/${g.id}',
+          online: g.supportsOnline),
+  ];
   out.addAll(const <LuxeItem>[
-    LuxeItem(fa: 'روم‌های بازی', en: 'Game rooms', tab: 3, icon: 'r3c1', route: '/rooms', rarity: 4),
-    LuxeItem(fa: 'آرکید', en: 'Arcade', tab: 3, icon: 'r5c5', route: '/world/nexora_arcade', rarity: 3),
-    LuxeItem(fa: 'رده‌بندی', en: 'Leaderboard', tab: 3, icon: 'r2c6', route: '/leaderboard', rarity: 3),
+    LuxeItem(
+        fa: 'بازی سریع آنلاین',
+        en: 'Quick online match',
+        subFa: 'حریف هم‌سطح در چند ثانیه',
+        subEn: 'An opponent in seconds',
+        tab: 3,
+        icon: 'r4c6',
+        route: '/rooms?tab=quick',
+        online: true),
+    LuxeItem(
+        fa: 'روم‌های بازی',
+        en: 'Game rooms',
+        subFa: 'روم بساز یا با کد وارد شو',
+        subEn: 'Create a room or join by code',
+        tab: 3,
+        icon: 'r4c5',
+        route: '/rooms?tab=rooms',
+        online: true),
+    LuxeItem(
+        fa: 'روم‌های صوتی',
+        en: 'Voice rooms',
+        subFa: 'گفتگوی زنده با بازیکن‌ها',
+        subEn: 'Live talk with players',
+        tab: 3,
+        icon: 'r3c1',
+        route: '/rooms?tab=talk',
+        online: true),
   ]);
   return out;
 }
@@ -94,53 +143,135 @@ List<LuxeItem> _gameItems() {
 List<LuxeWorld> buildLuxeWorlds() => <LuxeWorld>[
       LuxeWorld(
         k: 'games',
+        route: '/play',
         fa: 'بازی‌ها',
         en: 'GAMES',
         icon: 'r4c5',
         color: const Color(0xFFE2C27A),
-        tagFa: 'همه‌ی بازی‌ها در یک جا',
-        tagEn: 'Every game in one place',
-        tabsFa: const <String>['ورزشی', 'میزی', 'کارتی و گروهی', 'آنلاین'],
-        tabsEn: const <String>['Sports', 'Table', 'Cards & party', 'Online'],
+        tagFa: 'ورزشی، میزی، کارتی و آنلاین',
+        tagEn: 'Sports, table, cards and online',
+        tabsFa: const <String>['ورزشی', 'میزی', 'کارتی و گروهی', 'آنلاین و صوتی'],
+        tabsEn: const <String>['Sports', 'Table', 'Cards & party', 'Online & voice'],
         items: _gameItems(),
       ),
       const LuxeWorld(
-        k: 'events',
-        fa: 'رویدادها',
-        en: 'EVENTS',
-        icon: 'r3c5',
-        color: Color(0xFF9FC3D9),
-        tagFa: 'ماموریت‌ها و رویدادهای ویژه',
-        tagEn: 'Missions and special events',
-        tabsFa: <String>['ماموریت', 'رویداد'],
-        tabsEn: <String>['Missions', 'Events'],
+        k: 'social',
+        route: '/social',
+        fa: 'اجتماعی',
+        en: 'SOCIAL',
+        icon: 'r3c3',
+        color: Color(0xFFA8D8C0),
+        tagFa: 'پیام، پست و جامعه‌ها',
+        tagEn: 'Messages, posts and communities',
+        tabsFa: <String>['پیام‌ها', 'پست و استوری', 'جامعه‌ها'],
+        tabsEn: <String>['Messages', 'Feed & stories', 'Communities'],
         items: <LuxeItem>[
-          LuxeItem(fa: 'ماموریت‌ها', en: 'Missions', tab: 0, icon: 'r5c2', route: '/rewards', rarity: 3),
-          LuxeItem(fa: 'جایزه‌ی روزانه', en: 'Daily reward', tab: 0, icon: 'r3c6', action: 'daily', rarity: 4),
-          LuxeItem(fa: 'جامعه و رویدادها', en: 'Communities & events', tab: 1, icon: 'r3c5', route: '/world/social_station', rarity: 3),
-          LuxeItem(fa: 'تورنمنت‌ها', en: 'Tournaments', tab: 1, icon: 'r2c5', route: '/tournaments', rarity: 4),
+          LuxeItem(
+              fa: 'گفتگوها',
+              en: 'Chats',
+              subFa: 'پیام خصوصی، گروه و کانال',
+              subEn: 'Direct, groups and channels',
+              tab: 0,
+              icon: 'r3c3',
+              route: '/social/messages'),
+          LuxeItem(
+              fa: 'دوستان',
+              en: 'Friends',
+              subFa: 'دنبال‌کننده‌ها و درخواست‌ها',
+              subEn: 'Followers and requests',
+              tab: 0,
+              icon: 'r3c4',
+              route: '/social/messages?tab=friends'),
+          LuxeItem(
+              fa: 'پست و استوری',
+              en: 'Feed & stories',
+              subFa: 'لحظه‌هایت را به اشتراک بگذار',
+              subEn: 'Share your moments',
+              tab: 1,
+              icon: 'r5c3',
+              route: '/social/feed'),
+          LuxeItem(
+              fa: 'جامعه‌ها',
+              en: 'Communities',
+              subFa: 'باشگاه‌ها و رویدادهای گروهی',
+              subEn: 'Clubs and group events',
+              tab: 2,
+              icon: 'r3c4',
+              route: '/social/communities'),
+        ],
+      ),
+      const LuxeWorld(
+        k: 'compete',
+        route: '/compete',
+        fa: 'رقابت',
+        en: 'COMPETE',
+        icon: 'r2c5',
+        color: Color(0xFFE2C27A),
+        tagFa: 'تورنمنت، دعوت و رده‌بندی',
+        tagEn: 'Tournaments, invites and ranks',
+        tabsFa: <String>['تورنمنت‌ها', 'رده‌بندی'],
+        tabsEn: <String>['Tournaments', 'Rankings'],
+        items: <LuxeItem>[
+          LuxeItem(
+              fa: 'تورنمنت‌ها',
+              en: 'Tournaments',
+              subFa: 'حذفی، لیگ و سوئیسی با جایزه',
+              subEn: 'Knockout, league and swiss',
+              tab: 0,
+              icon: 'r2c5',
+              route: '/tournaments'),
+          LuxeItem(
+              fa: 'ورود با کد', en: 'Join by code', subFa: 'کد دعوت را وارد کن', subEn: 'Enter an invite code', tab: 0, icon: 'r4c6', route: '/tournaments/join'),
+          LuxeItem(
+              fa: 'دعوت‌ها', en: 'Invitations', subFa: 'دعوت‌ها و اعلان‌ها', subEn: 'Invites and notices', tab: 0, icon: 'r5c3', route: '/tournaments/inbox'),
+          LuxeItem(
+              fa: 'ساخت تورنمنت', en: 'Create', subFa: 'تورنمنت خودت را بساز', subEn: 'Host your own cup', tab: 0, icon: 'r5c4', route: '/tournaments/new'),
+          LuxeItem(
+              fa: 'رده‌بندی', en: 'Rankings', subFa: 'برترین‌های هر بازی', subEn: 'Top players of every game', tab: 1, icon: 'r2c6', route: '/leaderboard'),
         ],
       ),
       const LuxeWorld(
         k: 'rewards',
+        route: '/rewards',
         fa: 'جایزه‌ها',
         en: 'REWARDS',
         icon: 'r3c6',
         color: Color(0xFFE8B7A0),
-        tagFa: 'هدیه، جایزه و مدال',
-        tagEn: 'Gifts, rewards and medals',
-        tabsFa: <String>['جایزه', 'افتخار'],
-        tabsEn: <String>['Rewards', 'Honours'],
+        tagFa: 'روزانه، ماموریت و دستاورد',
+        tagEn: 'Daily, missions and achievements',
+        tabsFa: <String>['جایزه‌ها'],
+        tabsEn: <String>['Rewards'],
         items: <LuxeItem>[
-          LuxeItem(fa: 'جایزه‌ی روزانه', en: 'Daily reward', tab: 0, icon: 'r3c6', action: 'daily', rarity: 4),
-          LuxeItem(fa: 'جایزه و پک', en: 'Rewards & packs', tab: 0, icon: 'r5c6', route: '/rewards', rarity: 3),
-          LuxeItem(fa: 'مدال‌ها و دستاوردها', en: 'Medals', tab: 1, icon: 'r4c3', route: '/rewards', rarity: 3),
-          LuxeItem(fa: 'جام‌ها و رده‌بندی', en: 'Cups & ranks', tab: 1, icon: 'r5c4', route: '/leaderboard', rarity: 4),
+          LuxeItem(fa: 'جایزه‌ی روزانه', en: 'Daily reward', tab: 0, icon: 'r3c6', route: '/rewards?tab=0'),
+          LuxeItem(fa: 'ماموریت‌ها', en: 'Missions', tab: 0, icon: 'r5c2', route: '/rewards?tab=1'),
+          LuxeItem(fa: 'دستاوردها', en: 'Achievements', tab: 0, icon: 'r4c3', route: '/rewards?tab=2'),
+        ],
+      ),
+      const LuxeWorld(
+        k: 'shop',
+        route: '/shop',
+        fa: 'فروشگاه',
+        en: 'SHOP',
+        icon: 'r4c1',
+        color: Color(0xFFD9B872),
+        tagFa: 'تیم، الماس و ظاهر',
+        tagEn: 'Teams, gems and style',
+        tabsFa: <String>['فروشگاه'],
+        tabsEn: <String>['Shop'],
+        items: <LuxeItem>[
+          LuxeItem(
+              fa: 'تیم‌ها و الماس', en: 'Teams & gems', subFa: 'تیم‌های فوتبال با الماس', subEn: 'Football teams for gems', tab: 0, icon: 'r1c3', route: '/shop/teams'),
+          LuxeItem(
+              fa: 'تیم اختصاصی', en: 'Custom team', subFa: 'نام و لوگوی خودت', subEn: 'Your own name and logo', tab: 0, icon: 'r4c4', route: '/shop/custom'),
+          LuxeItem(
+              fa: 'ظاهر و آیتم‌ها', en: 'Cosmetics', subFa: 'آواتار، قاب، مهره و تم', subEn: 'Avatar, frames, pucks, themes', tab: 0, icon: 'r4c3', route: '/shop/cosmetics'),
+          LuxeItem(fa: 'تاریخچه', en: 'History', subFa: 'خریدها و تراکنش‌ها', subEn: 'Purchases and transactions', tab: 0, icon: 'r3c5', route: '/shop/history'),
         ],
       ),
       const LuxeWorld(
         k: 'oracle',
-        fa: 'هوش مصنوعی',
+        route: '/oracle',
+        fa: 'اوراکل',
         en: 'ORACLE AI',
         icon: 'r5c2',
         color: Color(0xFFC9B6F0),
@@ -149,89 +280,40 @@ List<LuxeWorld> buildLuxeWorlds() => <LuxeWorld>[
         tabsFa: <String>['اوراکل'],
         tabsEn: <String>['ORACLE'],
         items: <LuxeItem>[
-          LuxeItem(fa: 'گفتگو با اوراکل', en: 'Talk to ORACLE', tab: 0, icon: 'r5c2', route: '/oracle', rarity: 4),
-          LuxeItem(fa: 'تحلیل بازی من', en: 'Analyse my play', tab: 0, icon: 'r2c6',
-              route: '/oracle?q=%D8%A8%D8%A7%D8%B2%DB%8C%E2%80%8C%D9%87%D8%A7%DB%8C%20%D9%85%D9%86%20%D8%B1%D8%A7%20%D8%AA%D8%AD%D9%84%DB%8C%D9%84%20%DA%A9%D9%86',
-              rarity: 3),
-          LuxeItem(fa: 'پیشنهاد بازی', en: 'Suggest a game', tab: 0, icon: 'r5c6',
-              route: '/oracle?q=%DB%8C%DA%A9%20%D8%A8%D8%A7%D8%B2%DB%8C%20%D8%A8%D9%87%D9%85%20%D9%BE%DB%8C%D8%B4%D9%86%D9%87%D8%A7%D8%AF%20%D8%A8%D8%AF%D9%87',
-              rarity: 2),
-        ],
-      ),
-      const LuxeWorld(
-        k: 'chat',
-        fa: 'چت',
-        en: 'CHAT',
-        icon: 'r3c3',
-        color: Color(0xFFA8D8C0),
-        tagFa: 'دوستان، پیام و روم صوتی',
-        tagEn: 'Friends, messages and voice',
-        tabsFa: <String>['پیام', 'صدا', 'جامعه'],
-        tabsEn: <String>['Messages', 'Voice', 'Community'],
-        items: <LuxeItem>[
-          LuxeItem(fa: 'چت و رسانه', en: 'Chat & media', tab: 0, icon: 'r3c3', route: '/social', rarity: 3),
-          LuxeItem(fa: 'پیام‌ها، گروه‌ها و کانال‌ها', en: 'Messages & groups', tab: 0, icon: 'r3c4', route: '/world/orbit_network', rarity: 3),
-          LuxeItem(fa: 'روم صوتی', en: 'Voice rooms', tab: 1, icon: 'r3c1', route: '/rooms', rarity: 4),
-          LuxeItem(fa: 'پست و استوری', en: 'Posts & stories', tab: 2, icon: 'r5c3', route: '/world/nova_gallery', rarity: 3),
-          LuxeItem(fa: 'جامعه‌ها', en: 'Communities', tab: 2, icon: 'r3c4', route: '/world/social_station', rarity: 2),
-        ],
-      ),
-      const LuxeWorld(
-        k: 'shop',
-        fa: 'فروشگاه',
-        en: 'SHOP',
-        icon: 'r4c1',
-        color: Color(0xFFD9B872),
-        tagFa: 'خرید، هدیه و ظاهر',
-        tagEn: 'Buy, gift and style',
-        tabsFa: <String>['خرید', 'ظاهر'],
-        tabsEn: <String>['Shop', 'Style'],
-        items: <LuxeItem>[
-          LuxeItem(fa: 'فروشگاه', en: 'Exchange', tab: 0, icon: 'r4c1', route: '/world/nexora_exchange', rarity: 4),
-          LuxeItem(fa: 'آواتار و فضای من', en: 'Avatar & space', tab: 1, icon: 'r4c4', route: '/world/personal_orbit', rarity: 3),
+          LuxeItem(fa: 'گفتگو با اوراکل', en: 'Talk to ORACLE', tab: 0, icon: 'r5c2', route: '/oracle'),
         ],
       ),
       const LuxeWorld(
         k: 'profile',
+        route: '/profile',
         fa: 'پروفایل',
         en: 'PROFILE',
         icon: 'r4c4',
         color: Color(0xFFD4C4A8),
-        tagFa: 'حساب، جام‌ها و رده‌بندی',
-        tagEn: 'Account, trophies and ranks',
-        tabsFa: <String>['حساب', 'دستاورد'],
-        tabsEn: <String>['Account', 'Records'],
+        tagFa: 'هویت، حساب و تنظیمات',
+        tagEn: 'Identity, account and settings',
+        tabsFa: <String>['پروفایل'],
+        tabsEn: <String>['Profile'],
         items: <LuxeItem>[
-          LuxeItem(fa: 'فضای شخصی', en: 'Personal orbit', tab: 0, icon: 'r4c4', route: '/world/personal_orbit', rarity: 3),
-          LuxeItem(fa: 'حساب من', en: 'My account', tab: 0, icon: 'r4c2', route: '/account', rarity: 2),
-          LuxeItem(fa: 'تنظیمات', en: 'Settings', tab: 0, icon: 'r4c2', route: '/settings', rarity: 1),
-          LuxeItem(fa: 'رده‌بندی', en: 'Ranking', tab: 1, icon: 'r2c6', route: '/leaderboard', rarity: 3),
-          LuxeItem(fa: 'دستاوردها', en: 'Achievements', tab: 1, icon: 'r4c3', route: '/rewards', rarity: 3),
-        ],
-      ),
-      const LuxeWorld(
-        k: 'tournaments',
-        fa: 'تورنمنت‌ها',
-        en: 'TOURNAMENTS',
-        icon: 'r2c5',
-        color: Color(0xFFE2C27A),
-        tagFa: 'مسابقه‌ها و لیگ‌ها',
-        tagEn: 'Cups and leagues',
-        tabsFa: <String>['فعال', 'مدیریت'],
-        tabsEn: <String>['Live', 'Manage'],
-        items: <LuxeItem>[
-          LuxeItem(fa: 'تورنمنت‌ها', en: 'Tournaments', tab: 0, icon: 'r2c5', route: '/tournaments', rarity: 4),
-          LuxeItem(fa: 'ورود با کد', en: 'Join with code', tab: 0, icon: 'r4c6', route: '/tournaments/join', rarity: 2),
-          LuxeItem(fa: 'جدول رده‌بندی', en: 'Standings', tab: 0, icon: 'r2c6', route: '/leaderboard', rarity: 3),
-          LuxeItem(fa: 'ساخت تورنمنت', en: 'Create', tab: 1, icon: 'r5c4', route: '/tournaments/new', rarity: 3),
-          LuxeItem(fa: 'دعوت‌ها و اعلان‌ها', en: 'Inbox', tab: 1, icon: 'r5c3', route: '/tournaments/inbox', rarity: 2),
+          LuxeItem(
+              fa: 'پروفایل من', en: 'My profile', subFa: 'هویت، کمد، فضا و آمار', subEn: 'Identity, wardrobe, space, stats', tab: 0, icon: 'r4c4', route: '/profile/me'),
+          LuxeItem(fa: 'حساب کاربری', en: 'Account', subFa: 'ورود، رمز و امنیت', subEn: 'Sign-in, password, security', tab: 0, icon: 'r3c4', route: '/account'),
+          LuxeItem(fa: 'تنظیمات', en: 'Settings', subFa: 'روز و شب، صدا، زبان', subEn: 'Day & night, sound, language', tab: 0, icon: 'r4c2', route: '/settings'),
+          LuxeItem(
+              fa: 'مدیریت', en: 'Admin', subFa: 'فقط کارکنان', subEn: 'Staff only', tab: 0, icon: 'r4c6', route: '/admin', staffOnly: true),
         ],
       ),
     ];
 
+/// Station by key. Old keys of the previous menus map to their new home.
 LuxeWorld? luxeWorld(String k) {
+  final String key = switch (k) {
+    'chat' => 'social',
+    'tournaments' || 'events' => 'compete',
+    _ => k,
+  };
   for (final LuxeWorld w in buildLuxeWorlds()) {
-    if (w.k == k) return w;
+    if (w.k == key) return w;
   }
   return null;
 }

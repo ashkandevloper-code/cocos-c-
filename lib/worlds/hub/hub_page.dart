@@ -11,7 +11,7 @@ import '../../core/online/online_service.dart';
 import '../../core/profile/profile_service.dart';
 import '../../core/settings/app_settings.dart';
 import '../../core/ui2/anix_kit.dart';
-import '../../core/ui2/luxe.dart';
+import '../../core/lux/lux.dart';
 import '../../core/ui2/nx2_widgets.dart';
 import 'hub_search.dart';
 import 'luxe_station_page.dart';
@@ -48,7 +48,7 @@ class _HubPageState extends ConsumerState<HubPage> with SingleTickerProviderStat
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (Luxe.reduceMotion(context)) {
+    if (LuxMotion.reduced(context)) {
       _sheen.stop();
     } else if (!_sheen.isAnimating) {
       _sheen.repeat();
@@ -90,18 +90,21 @@ class _HubPageState extends ConsumerState<HubPage> with SingleTickerProviderStat
 
   int _wrap(int page) => page % _worlds.length;
 
-  void _enter(LuxeWorld w) => context.push('/station/${w.k}');
+  void _enter(LuxeWorld w) => context.push(w.route);
 
   @override
   Widget build(BuildContext context) {
     final ProfileService p = ref.watch(profileProvider);
     final LuxeWorld cur = _worlds[_idx];
     final bool fa = context.isFa;
+    final LuxPalette lp = LuxPalette.of(context);
     return Scaffold(
-      backgroundColor: Luxe.bg,
+      backgroundColor: lp.bg,
       extendBody: true,
-      bottomNavigationBar: const Nx2Dock(current: Nx2Tab.home),
-      body: LuxeScene(
+      bottomNavigationBar: const LuxDock(current: Nx2Tab.home),
+      body: LuxScene(
+        accent: cur.color,
+        artOpacity: lp.isDark ? .6 : .14,
         child: SafeArea(
           bottom: false,
           child: LayoutBuilder(builder: (BuildContext ctx, BoxConstraints box) {
@@ -114,6 +117,7 @@ class _HubPageState extends ConsumerState<HubPage> with SingleTickerProviderStat
               SizedBox(
                 height: ringH,
                 child: PageView.builder(
+                  key: const ValueKey<String>('hub-ring'),
                   controller: _pc,
                   onPageChanged: (int i) => setState(() => _idx = _wrap(i)),
                   itemBuilder: (BuildContext c, int i) {
@@ -141,7 +145,7 @@ class _HubPageState extends ConsumerState<HubPage> with SingleTickerProviderStat
                           if (_wrap(i) == _idx) {
                             _enter(w);
                           } else {
-                            _pc.animateToPage(i, duration: const Duration(milliseconds: 700), curve: Luxe.ease);
+                            _pc.animateToPage(i, duration: const Duration(milliseconds: 700), curve: LuxMotion.ease);
                           }
                         },
                       ),
@@ -151,18 +155,16 @@ class _HubPageState extends ConsumerState<HubPage> with SingleTickerProviderStat
               ),
               const SizedBox(height: 16),
               AnimatedSwitcher(
-                duration: const Duration(milliseconds: 380),
+                duration: LuxMotion.normal,
                 child: Padding(
                   key: ValueKey<String>(cur.k),
                   padding: const EdgeInsets.symmetric(horizontal: 28),
                   child: Column(children: <Widget>[
-                    Text(cur.en, style: Luxe.latin),
+                    Text(cur.en, style: LuxType.latin.copyWith(color: lp.isDark ? lp.gold : lp.gold3)),
                     const SizedBox(height: 4),
-                    Text(fa ? cur.fa : cur.en,
-                        style: const TextStyle(fontSize: 26, color: Luxe.ink, fontWeight: FontWeight.w400)),
+                    Text(fa ? cur.fa : cur.en, style: LuxType.title.copyWith(fontSize: 26, color: lp.ink)),
                     const SizedBox(height: 4),
-                    Text(fa ? cur.tagFa : cur.tagEn,
-                        textAlign: TextAlign.center, style: const TextStyle(fontSize: 12.5, color: Luxe.mute)),
+                    Text(fa ? cur.tagFa : cur.tagEn, textAlign: TextAlign.center, style: LuxType.label.copyWith(color: lp.mute)),
                   ]),
                 ),
               ),
@@ -172,13 +174,12 @@ class _HubPageState extends ConsumerState<HubPage> with SingleTickerProviderStat
                 children: List<Widget>.generate(_worlds.length, (int i) {
                   final bool on = i == _idx;
                   return AnimatedContainer(
-                    duration: const Duration(milliseconds: 400),
-                    curve: Luxe.ease,
+                    duration: LuxMotion.normal,
+                    curve: LuxMotion.ease,
                     margin: const EdgeInsets.symmetric(horizontal: 3.5),
                     width: on ? 22 : 6,
                     height: 6,
-                    decoration: BoxDecoration(
-                        color: on ? Luxe.gold : const Color(0x40F6E7BD), borderRadius: BorderRadius.circular(9)),
+                    decoration: BoxDecoration(color: on ? lp.gold : lp.faint, borderRadius: BorderRadius.circular(9)),
                   );
                 }),
               ),
@@ -195,27 +196,26 @@ class _Brand extends StatelessWidget {
   const _Brand();
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-        height: 92,
-        child: Column(mainAxisSize: MainAxisSize.min, children: <Widget>[
-          Expanded(
-            child: DecoratedBox(
-              decoration: const BoxDecoration(
-                  boxShadow: <BoxShadow>[BoxShadow(color: Color(0x40D9B872), blurRadius: 30, spreadRadius: -6)]),
-              child: Image.asset('assets/branding/anix_logo.webp',
-                  cacheWidth: 300,
-                  errorBuilder: (_, __, ___) => const Text('ANIX',
-                      style: TextStyle(fontSize: 36, color: Luxe.gold, letterSpacing: 8))),
-            ),
+  Widget build(BuildContext context) {
+    final LuxPalette p = LuxPalette.of(context);
+    return SizedBox(
+      height: 92,
+      child: Column(mainAxisSize: MainAxisSize.min, children: <Widget>[
+        Expanded(
+          child: DecoratedBox(
+            decoration: BoxDecoration(boxShadow: <BoxShadow>[BoxShadow(color: p.gold.withValues(alpha: .25), blurRadius: 30, spreadRadius: -6)]),
+            child: Image.asset('assets/branding/anix_logo.webp',
+                cacheWidth: 300,
+                errorBuilder: (_, __, ___) => Text('ANIX', style: LuxType.latinDisplay.copyWith(color: p.gold))),
           ),
-          ShaderMask(
-            shaderCallback: (Rect r) => Luxe.goldGrad.createShader(r),
-            child: const Text('P R O',
-                style: TextStyle(
-                    fontFamily: 'ChakraPetch', fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 4)),
-          ),
-        ]),
-      );
+        ),
+        ShaderMask(
+          shaderCallback: (Rect r) => LinearGradient(colors: <Color>[p.gold2, p.gold, p.gold3]).createShader(r),
+          child: Text('P R O', style: LuxType.latin.copyWith(fontSize: 13, color: Colors.white, letterSpacing: 4)),
+        ),
+      ]),
+    );
+  }
 }
 
 class _WorldCard extends StatelessWidget {
@@ -227,106 +227,104 @@ class _WorldCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool fa = context.isFa;
+    final LuxPalette p = LuxPalette.of(context);
     return Center(
       child: AspectRatio(
         aspectRatio: 3 / 4.3,
-        child: LuxePress(
-          semantics: fa ? world.fa : world.en,
-          onTap: onTap,
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(30),
-              border: Border.all(color: const Color(0x47F6E7BD)),
-              boxShadow: <BoxShadow>[
-                const BoxShadow(color: Colors.black, blurRadius: 60, offset: Offset(0, 40), spreadRadius: -28),
-                BoxShadow(color: world.color.withValues(alpha: 0.45), blurRadius: 50, spreadRadius: -14),
-              ],
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: <Color>[Color.lerp(const Color(0xFF1C1A14), world.color, 0.22)!, Luxe.bg],
+        child: Semantics(
+          button: true,
+          label: fa ? world.fa : world.en,
+          child: LuxPress(
+            onTap: onTap,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(LuxRadius.card),
+                border: Border.all(color: p.gold2.withValues(alpha: .28)),
+                boxShadow: <BoxShadow>[
+                  BoxShadow(color: p.shadow.withValues(alpha: p.isDark ? 1 : .35), blurRadius: 60, offset: const Offset(0, 40), spreadRadius: -28),
+                  BoxShadow(color: world.color.withValues(alpha: 0.45), blurRadius: 50, spreadRadius: -14),
+                ],
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: <Color>[Color.lerp(const Color(0xFF1C1A14), world.color, 0.22)!, const Color(0xFF07080C)],
+                ),
               ),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(30),
-              child: Stack(fit: StackFit.expand, children: <Widget>[
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      center: const Alignment(0, -1),
-                      radius: 1.1,
-                      colors: <Color>[world.color.withValues(alpha: 0.23), Colors.transparent],
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(LuxRadius.card),
+                child: Stack(fit: StackFit.expand, children: <Widget>[
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: RadialGradient(
+                          center: const Alignment(0, -1), radius: 1.1, colors: <Color>[world.color.withValues(alpha: 0.23), Colors.transparent]),
                     ),
                   ),
-                ),
-                const DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      stops: <double>[0, 0.85],
-                      colors: <Color>[Color(0x0D07080C), Color(0xD907080C)],
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        stops: <double>[0, 0.85],
+                        colors: <Color>[Color(0x0D07080C), Color(0xD907080C)],
+                      ),
                     ),
                   ),
-                ),
-                Align(
-                  alignment: const Alignment(0, -0.5),
-                  child: FractionallySizedBox(
-                    widthFactor: 0.74,
-                    child: AspectRatio(
-                      aspectRatio: 1,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(22),
-                          border: Border.all(color: const Color(0x59D9B872), width: 1.2),
-                          boxShadow: <BoxShadow>[
-                            BoxShadow(color: world.color.withValues(alpha: 0.45), blurRadius: 34, spreadRadius: -8),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(21),
-                          child: Image.asset(Luxe.icon(world.icon),
-                              fit: BoxFit.cover, cacheWidth: 360, errorBuilder: (_, __, ___) => const SizedBox()),
+                  Align(
+                    alignment: const Alignment(0, -0.5),
+                    child: FractionallySizedBox(
+                      widthFactor: 0.74,
+                      child: AspectRatio(
+                        aspectRatio: 1,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(color: const Color(0x59D9B872), width: 1.2),
+                            boxShadow: <BoxShadow>[BoxShadow(color: world.color.withValues(alpha: 0.45), blurRadius: 34, spreadRadius: -8)],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(21),
+                            child: Image.asset('assets/luxe/icons/${world.icon}.webp',
+                                fit: BoxFit.cover, cacheWidth: 360, errorBuilder: (_, __, ___) => const SizedBox()),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                Positioned(
-                  left: 8,
-                  right: 8,
-                  bottom: 22,
-                  child: Column(children: <Widget>[
-                    Text(fa ? world.fa : world.en,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 19, color: Luxe.ink, fontWeight: FontWeight.w500)),
-                    if (fa) const SizedBox(height: 2),
-                    if (fa) Text(world.en, style: Luxe.latin.copyWith(fontSize: 10, color: Luxe.gold2)),
-                  ]),
-                ),
-                // Moving sheen across the glass.
-                IgnorePointer(
-                  child: AnimatedBuilder(
-                    animation: sheen,
-                    builder: (BuildContext c, _) {
-                      final double t = Curves.easeInOut.transform((sheen.value / 0.6).clamp(0.0, 1.0));
-                      return FractionalTranslation(
-                        translation: Offset(-1.2 + t * 2.4, 0),
-                        child: const DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment(-1, -0.5),
-                              end: Alignment(1, 0.5),
-                              stops: <double>[0.4, 0.5, 0.6],
-                              colors: <Color>[Colors.transparent, Color(0x24FFFFFF), Colors.transparent],
-                            ),
-                          ),
-                        ),
-                      );
-                    },
+                  Positioned(
+                    left: 8,
+                    right: 8,
+                    bottom: 22,
+                    child: Column(children: <Widget>[
+                      Text(fa ? world.fa : world.en,
+                          textAlign: TextAlign.center, style: LuxType.headline.copyWith(fontSize: 19, color: const Color(0xFFF4EAD2))),
+                      if (fa) const SizedBox(height: 2),
+                      if (fa) Text(world.en, style: LuxType.latin.copyWith(fontSize: 10, color: const Color(0xFFF6E7BD))),
+                    ]),
                   ),
-                ),
-              ]),
+                  if (!LuxMotion.reduced(context))
+                    IgnorePointer(
+                      child: AnimatedBuilder(
+                        animation: sheen,
+                        builder: (BuildContext c, _) {
+                          final double t = Curves.easeInOut.transform((sheen.value / 0.6).clamp(0.0, 1.0));
+                          return FractionalTranslation(
+                            translation: Offset(-1.2 + t * 2.4, 0),
+                            child: const DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment(-1, -0.5),
+                                  end: Alignment(1, 0.5),
+                                  stops: <double>[0.4, 0.5, 0.6],
+                                  colors: <Color>[Colors.transparent, Color(0x24FFFFFF), Colors.transparent],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ]),
+              ),
             ),
           ),
         ),
@@ -342,96 +340,71 @@ class _Hud extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final LuxPalette lp = LuxPalette.of(context);
     final String name = profile.username.isEmpty ? context.tx('کاوشگر', 'Explorer') : profile.username;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
       child: Row(children: <Widget>[
-        LuxePress(
-          semantics: context.tx('پروفایل', 'Profile'),
-          onTap: () => _profileSheet(context, ref),
-          child: Stack(clipBehavior: Clip.none, children: <Widget>[
-            Container(
-              width: 46,
-              height: 46,
-              padding: const EdgeInsets.all(1.6),
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(colors: <Color>[Luxe.gold2, Luxe.gold3, Luxe.gold2]),
-              ),
-              child: ClipOval(
-                child: ColoredBox(
-                  color: const Color(0xFF0C0D12),
-                  child: AnixFramedAvatar(
-                      avatarId: profile.portrait, photoUrl: profile.avatarUrl, tier: anixTierForLevel(profile.level), size: 43),
+        Semantics(
+          button: true,
+          label: context.tx('پروفایل', 'Profile'),
+          child: LuxPress(
+            onTap: () => _profileSheet(context, ref),
+            child: Stack(clipBehavior: Clip.none, children: <Widget>[
+              Container(
+                width: 46,
+                height: 46,
+                padding: const EdgeInsets.all(1.6),
+                decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: <Color>[lp.gold2, lp.gold3, lp.gold2])),
+                child: ClipOval(
+                  child: ColoredBox(
+                    color: const Color(0xFF0C0D12),
+                    child: AnixFramedAvatar(
+                        avatarId: profile.portrait, photoUrl: profile.avatarUrl, tier: anixTierForLevel(profile.level), size: 43),
+                  ),
                 ),
               ),
-            ),
-            PositionedDirectional(
-              bottom: -4,
-              end: -4,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                decoration: BoxDecoration(gradient: Luxe.goldGrad, borderRadius: BorderRadius.circular(8)),
-                child: Text('${profile.level}',
-                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF1A1408))),
+              PositionedDirectional(
+                bottom: -4,
+                end: -4,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  decoration: BoxDecoration(gradient: lp.goldGradient, borderRadius: BorderRadius.circular(8)),
+                  child: Text('${profile.level}', style: LuxType.latin.copyWith(fontSize: 11, letterSpacing: 0, color: lp.onGold)),
+                ),
               ),
-            ),
-          ]),
+            ]),
+          ),
         ),
         const SizedBox(width: 10),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: <Widget>[
-            Text(name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 14, color: Luxe.ink, fontWeight: FontWeight.w600)),
-            Text(context.tx(profile.rankTitleFa, profile.rankTitleEn),
-                maxLines: 1, style: const TextStyle(fontSize: 11, color: Luxe.mute)),
+            Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: LuxType.bodyStrong.copyWith(color: lp.ink)),
+            Text(context.tx(profile.rankTitleFa, profile.rankTitleEn), maxLines: 1, style: LuxType.caption.copyWith(color: lp.mute)),
           ]),
         ),
-        LuxeChip(
-          semantics: context.tx('سکه', 'Coins'),
-          onTap: () => context.push('/world/nexora_exchange'),
-          child: Row(mainAxisSize: MainAxisSize.min, children: <Widget>[
-            const LuxeCoin(size: 14),
-            const SizedBox(width: 5),
-            Text(_fmt(profile.coins)),
-          ]),
+        Semantics(
+          label: context.tx('سکه', 'Coins'),
+          child: Nx2Stat(value: _fmt(profile.coins), onTap: () => context.push('/shop')),
         ),
         const SizedBox(width: 6),
-        LuxeChip(
-          semantics: context.tx('جم', 'Gems'),
-          onTap: () => context.push('/world/nexora_exchange'),
-          child: Row(mainAxisSize: MainAxisSize.min, children: <Widget>[
-            const LuxeGem(size: 14),
-            const SizedBox(width: 5),
-            Text(_fmt(profile.gems)),
-          ]),
+        Semantics(
+          label: context.tx('جم', 'Gems'),
+          child: Nx2GemStat(gems: profile.gems, onTap: () => context.push('/shop/teams')),
         ),
-        if (liveRooms != null) const SizedBox(width: 6),
-        if (liveRooms != null) LuxeChip(
-          semantics: context.tx('روم‌های فعال', 'Live rooms'),
-          onTap: () => context.push('/rooms'),
-          child: Row(mainAxisSize: MainAxisSize.min, children: <Widget>[
-            Container(
-                width: 6,
-                height: 6,
-                decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: liveRooms == null ? Luxe.mute : const Color(0xFF7BE0A1),
-                    boxShadow: liveRooms == null
-                        ? null
-                        : const <BoxShadow>[BoxShadow(color: Color(0xFF7BE0A1), blurRadius: 6)])),
-            const SizedBox(width: 5),
-            Text(liveRooms == null ? context.tx('روم', 'Rooms') : '$liveRooms'),
-          ]),
-        ),
+        if (liveRooms != null) ...<Widget>[
+          const SizedBox(width: 6),
+          Semantics(
+            label: context.tx('روم‌های فعال', 'Live rooms'),
+            child: LuxChip(label: '$liveRooms', live: true, onTap: () => context.push('/rooms?tab=talk')),
+          ),
+        ],
         const SizedBox(width: 6),
-        LuxePress(
-          semantics: context.tx('جستجو', 'Search'),
-          onTap: () => showSearch<void>(context: context, delegate: HubSearchDelegate(isFa: context.isFa)),
-          child: const LuxeGlass(
-              radius: 99, padding: EdgeInsets.all(8), child: Icon(Icons.search_rounded, size: 17, color: Luxe.ink)),
+        LuxIconButton(
+          icon: Icons.search_rounded,
+          size: 36,
+          tooltip: context.tx('جستجو', 'Search'),
+          onPressed: () => showSearch<void>(context: context, delegate: HubSearchDelegate(isFa: context.isFa)),
         ),
       ]),
     );
@@ -445,67 +418,46 @@ class _Hud extends ConsumerWidget {
   }
 
   void _profileSheet(BuildContext context, WidgetRef ref) {
-    showLuxeSheet<void>(context, builder: (BuildContext ctx) {
+    showLuxSheet<void>(context, builder: (BuildContext ctx) {
       return Consumer(builder: (BuildContext ctx, WidgetRef ref, _) {
         final ProfileService p = ref.watch(profileProvider);
-        return SingleChildScrollView(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: <Widget>[
-            Row(children: <Widget>[
-              AnixFramedAvatar(avatarId: p.portrait, photoUrl: p.avatarUrl, tier: anixTierForLevel(p.level), size: 56),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
-                  Text(p.username.isEmpty ? ctx.tx('کاوشگر', 'Explorer') : p.username,
-                      style: const TextStyle(fontSize: 17, color: Luxe.ink, fontWeight: FontWeight.w600)),
-                  Text('${ctx.tx('سطح', 'Level')} ${p.level} · ${ctx.tx(p.rankTitleFa, p.rankTitleEn)}',
-                      style: const TextStyle(fontSize: 12, color: Luxe.mute)),
-                ]),
-              ),
-            ]),
-            const SizedBox(height: 14),
-            LuxeBar(value: p.levelProgress, height: 7),
-            const SizedBox(height: 6),
-            Text('XP ${p.xpIntoLevel}', style: const TextStyle(fontSize: 11, color: Luxe.mute)),
-            const SizedBox(height: 6),
-            LuxeOption(
-                label: ctx.tx('سکه', 'Coins'),
-                trailing: Row(mainAxisSize: MainAxisSize.min, children: <Widget>[
-                  const LuxeCoin(),
-                  const SizedBox(width: 6),
-                  Text('${p.coins}', style: const TextStyle(color: Luxe.gold2, fontWeight: FontWeight.w700)),
-                ]),
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  context.push('/world/nexora_exchange');
-                }),
-            LuxeOption(
-                label: ctx.tx('جم', 'Gems'),
-                trailing: Row(mainAxisSize: MainAxisSize.min, children: <Widget>[
-                  const LuxeGem(),
-                  const SizedBox(width: 6),
-                  Text('${p.gems}', style: const TextStyle(color: Luxe.gold2, fontWeight: FontWeight.w700)),
-                ]),
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  context.push('/world/nexora_exchange');
-                }),
-            if (p.canClaimDaily)
-              LuxeOption(
-                  label: ctx.tx('دریافت جایزه‌ی امروز', 'Claim today\'s reward'),
-                  icon: 'r3c6',
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    luxeClaimDaily(context, ref);
-                  }),
-            LuxeOption(
-                label: ctx.tx('فضای شخصی و پروفایل', 'Personal orbit'),
-                icon: 'r4c4',
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  context.push('/world/personal_orbit');
-                }),
+        final LuxPalette lp = LuxPalette.of(ctx);
+        void go(String r) {
+          Navigator.of(ctx).pop();
+          context.push(r);
+        }
+
+        return Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: <Widget>[
+          Row(children: <Widget>[
+            AnixFramedAvatar(avatarId: p.portrait, photoUrl: p.avatarUrl, tier: anixTierForLevel(p.level), size: 56),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
+                Text(p.username.isEmpty ? ctx.tx('کاوشگر', 'Explorer') : p.username, style: LuxType.headline.copyWith(color: lp.ink)),
+                Text('${ctx.tx('سطح', 'Level')} ${p.level} · ${ctx.tx(p.rankTitleFa, p.rankTitleEn)}',
+                    style: LuxType.caption.copyWith(color: lp.mute, fontSize: 12)),
+              ]),
+            ),
           ]),
-        );
+          const SizedBox(height: 14),
+          LuxProgress(value: p.levelProgress, height: 6),
+          const SizedBox(height: 6),
+          Text('XP ${p.xpIntoLevel}', style: LuxType.caption.copyWith(color: lp.mute)),
+          const SizedBox(height: 6),
+          LuxOption(label: ctx.tx('سکه: ${p.coins}', 'Coins: ${p.coins}'), icon: Icons.toll_rounded, onTap: () => go('/shop')),
+          LuxOption(label: ctx.tx('الماس: ${p.gems}', 'Gems: ${p.gems}'), icon: Icons.diamond_rounded, onTap: () => go('/shop/teams')),
+          if (p.canClaimDaily)
+            LuxOption(
+                label: ctx.tx('دریافت جایزه‌ی امروز', 'Claim today\'s reward'),
+                asset: 'assets/luxe/icons/r3c6.webp',
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  luxeClaimDaily(context, ref);
+                }),
+          LuxOption(label: ctx.tx('پروفایل من', 'My profile'), asset: 'assets/luxe/icons/r4c4.webp', onTap: () => go('/profile/me')),
+          LuxOption(label: ctx.tx('جایزه‌ها', 'Rewards'), asset: 'assets/luxe/icons/r5c2.webp', onTap: () => go('/rewards')),
+          LuxOption(label: ctx.tx('تنظیمات', 'Settings'), asset: 'assets/luxe/icons/r4c2.webp', onTap: () => go('/settings')),
+        ]);
       });
     });
   }

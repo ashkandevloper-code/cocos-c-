@@ -11,7 +11,7 @@ import '../theme/nx_theme.dart';
 import '../ui2/nx2_widgets.dart';
 import '../ui2/oracle_mascot.dart';
 
-import '../ui2/anix_kit.dart';
+import '../lux/lux.dart';
 /// Animated cosmic background used by every world (respects quality + reduced motion).
 class NxBackground extends ConsumerStatefulWidget {
   const NxBackground(
@@ -140,7 +140,7 @@ class NxBrandBackground extends StatelessWidget {
   Widget build(BuildContext context) => Nx2Background(room: room, scene: scene, child: child);
 }
 
-/// Premium inset panel with a quiet metallic/neon rim, shared by all app worlds.
+/// Glass panel shared by every screen (Station Luxe [LuxPanel]); a gold [borderColor] marks a featured panel.
 class GlassPanel extends StatelessWidget {
   const GlassPanel({
     super.key,
@@ -162,33 +162,21 @@ class GlassPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // NX2: chamfered neon glass. Gold borders keep the legendary look.
     final Color? bc = borderColor;
-    final bool gold = bc != null &&
-        (bc.r > 0.8 && bc.g > 0.6 && bc.b < 0.5);
-    final Color? t = tint?.withValues(alpha: math.min(0.35, tint!.a));
-    final Widget panel = Nx2Panel(
+    final bool gold = bc != null && (bc.r > 0.8 && bc.g > 0.6 && bc.b < 0.5);
+    return LuxPanel(
       padding: padding,
-      cut: math.min(16, math.max(8, radius * 0.6)),
-      gold: gold,
-      tint: t,
-      borderColor: gold ? null : bc?.withValues(alpha: 1),
+      radius: math.max(18, radius),
+      highlight: gold,
+      glow: gold ? null : (tint == null ? null : tint!.withValues(alpha: 1)),
+      blur: blur,
+      onTap: onTap,
       child: child,
-    );
-    if (onTap == null) return panel;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        splashColor: Nx2.violet.withValues(alpha: 0.18),
-        highlightColor: Colors.transparent,
-        child: panel,
-      ),
     );
   }
 }
 
-/// Small rounded label.
+/// Small rounded label (Station Luxe chip).
 class NxPill extends StatelessWidget {
   const NxPill({super.key, required this.label, this.icon, this.color});
   final String label;
@@ -197,40 +185,29 @@ class NxPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color pillColor = color ?? Nx2.cyan;
-    return CustomPaint(
-      painter: Nx2FramePainter(
-        cut: 7,
-        glow: 0,
-        strokeWidth: 1.1,
-        fill: LinearGradient(colors: <Color>[
-          pillColor.withValues(alpha: 0.22),
-          const Color(0xE6120A33),
-        ]),
-        border: LinearGradient(colors: <Color>[
-          pillColor,
-          pillColor.withValues(alpha: 0.5),
-        ]),
+    final LuxPalette p = LuxPalette.of(context);
+    final Color c = color ?? p.gold;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(99),
+        color: p.isDark ? const Color(0xCC0C0B09) : p.panelHi,
+        border: Border.all(color: c.withValues(alpha: .55)),
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          if (icon != null) ...[
-            Icon(icon, size: 14, color: pillColor),
-            const SizedBox(width: 4)
-          ],
-          Text(label,
-              style: TextStyle(
-                  color: Color.lerp(pillColor, Colors.white, 0.35),
-                  fontWeight: FontWeight.w800,
-                  fontSize: 12)),
-        ]),
-      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: <Widget>[
+        if (icon != null) ...<Widget>[Icon(icon, size: 12, color: p.isDark ? c : Color.lerp(c, Colors.black, .35)), const SizedBox(width: 4)],
+        Text(label,
+            style: LuxType.caption.copyWith(
+                color: p.isDark ? Color.lerp(c, Colors.white, .35) : Color.lerp(c, Colors.black, .45),
+                fontWeight: FontWeight.w700,
+                fontSize: 10.5,
+                letterSpacing: .4)),
+      ]),
     );
   }
 }
 
-/// Coins + level chip for app bars.
+/// Coins + gems + level chips for headers.
 class WalletChip extends ConsumerWidget {
   const WalletChip({super.key});
 
@@ -242,12 +219,12 @@ class WalletChip extends ConsumerWidget {
       const SizedBox(width: 6),
       Nx2GemStat(gems: p.gems),
       const SizedBox(width: 6),
-      Nx2Stat(value: '${p.level}', icon: Icons.bolt_rounded, color: Nx2.cyan),
+      Nx2Stat(value: '${p.level}', icon: Icons.bolt_rounded, color: const Color(0xFFF6E7BD)),
     ]);
   }
 }
 
-/// XP progress bar.
+/// XP progress (level, rank title, XP and a gold bar).
 class XpBar extends ConsumerWidget {
   const XpBar({super.key, this.height = 10});
   final double height;
@@ -255,24 +232,22 @@ class XpBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final p = ref.watch(profileProvider);
+    final LuxPalette lp = LuxPalette.of(context);
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Row(children: [
-        Text('${context.tx('سطح', 'Level')} ${p.level}',
-            style: const TextStyle(fontWeight: FontWeight.w800)),
+        Text('${context.tx('سطح', 'Level')} ${p.level}', style: LuxType.bodyStrong.copyWith(color: lp.ink)),
         const SizedBox(width: 8),
-        Text(context.tx(p.rankTitleFa, p.rankTitleEn),
-            style: const TextStyle(color: NxColors.textDim, fontSize: 12)),
+        Text(context.tx(p.rankTitleFa, p.rankTitleEn), style: LuxType.caption.copyWith(color: lp.mute, fontSize: 12)),
         const Spacer(),
-        Text('${p.xpIntoLevel}/${ProfileService.xpForLevel(p.level)} XP',
-            style: const TextStyle(color: NxColors.textDim, fontSize: 12)),
+        Text('${p.xpIntoLevel}/${ProfileService.xpForLevel(p.level)} XP', style: LuxType.caption.copyWith(color: lp.mute, fontSize: 12)),
       ]),
       const SizedBox(height: 6),
-      Nx2Progress(value: p.levelProgress, height: height),
+      LuxProgress(value: p.levelProgress, height: math.min(height, 6)),
     ]);
   }
 }
 
-/// Standard world page scaffold (NX2 top bar, cosmic backdrop, optional bottom dock).
+/// Standard page scaffold for worlds (Station Luxe): scene, header with back / search / wallet, optional dock.
 class NxWorldScaffold extends StatelessWidget {
   const NxWorldScaffold({
     super.key,
@@ -295,19 +270,17 @@ class NxWorldScaffold extends StatelessWidget {
   final Widget? bottomNavigationBar;
   final bool showWallet;
 
-  /// When set, the NX2 bottom dock is shown with this tab highlighted.
+  /// When set, the dock is shown with this tab highlighted.
   final Nx2Tab? dock;
   final bool room;
 
-  /// Scene art; by default arcade pages get the ANIX arcade art and social pages the social art.
+  /// Scene art; by default arcade pages get the arcade art and social pages the social art.
   final Nx2Scene? scene;
 
   Nx2Scene? get _scene {
     if (scene != null) return scene;
     if (identical(palette, WorldPalette.arcade)) return Nx2Scene.arcade;
-    if (identical(palette, WorldPalette.social) ||
-        identical(palette, WorldPalette.nova) ||
-        identical(palette, WorldPalette.orbit)) {
+    if (identical(palette, WorldPalette.social) || identical(palette, WorldPalette.nova) || identical(palette, WorldPalette.orbit)) {
       return Nx2Scene.social;
     }
     return null;
@@ -315,21 +288,18 @@ class NxWorldScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Widget? bottom = bottomNavigationBar ??
-        (dock != null ? Nx2Dock(current: dock) : null);
+    final LuxPalette p = LuxPalette.of(context);
+    final Widget? bottom = bottomNavigationBar ?? (dock != null ? LuxDock(current: dock) : null);
     return Scaffold(
       extendBodyBehindAppBar: true,
-      backgroundColor: Nx2.deep,
+      backgroundColor: p.bg,
       appBar: Nx2TopBar(title: title, actions: actions, showWallet: showWallet),
       floatingActionButton: floatingActionButton,
       bottomNavigationBar: bottom,
-      body: NxBrandBackground(
+      body: Nx2Background(
         room: room,
         scene: _scene,
-        child: SafeArea(
-          bottom: bottom == null,
-          child: body,
-        ),
+        child: SafeArea(bottom: bottom == null, child: body),
       ),
     );
   }
@@ -349,38 +319,22 @@ class OracleAvatar extends StatelessWidget {
 /// Shows level-up / achievement celebration (short, skippable).
 Future<void> showAwardOutcome(BuildContext context, AwardOutcome o) async {
   if (!o.levelUp && o.unlocked.isEmpty) return;
-  await showDialog<void>(
-    context: context,
-    builder: (ctx) => AnixDialog(
-      title: Row(children: [
-        const Icon(Icons.auto_awesome, color: NxColors.gold),
-        const SizedBox(width: 8),
-        Expanded(
-            child: Text(o.levelUp
-                ? ctx.tx('ارتقای سطح!', 'Level up!')
-                : ctx.tx('دستاورد جدید!', 'New achievement!'))),
-      ]),
-      content: Column(mainAxisSize: MainAxisSize.min, children: [
-        if (o.levelUp)
-          Text('${ctx.tx('سطح', 'Level')} ${o.newLevel}',
-              style: const TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w900,
-                  color: NxColors.turquoise)),
-        for (final a in o.unlocked)
-          ListTile(
-            leading: Image.asset(AppAssets.achievement(a.asset),
-                width: 44, cacheWidth: 120),
-            title: Text(ctx.tx(a.nameFa, a.nameEn)),
-            subtitle: Text('${ctx.tx(a.descFa, a.descEn)}  +${a.coinReward}'),
-          ),
-      ]),
-      actions: [
-        FilledButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(ctx.tx('عالی', 'Great')))
-      ],
-    ),
+  final LuxPalette p = LuxPalette.of(context);
+  await showLuxDialog<void>(
+    context,
+    icon: Icons.auto_awesome_rounded,
+    title: o.levelUp ? context.tx('ارتقای سطح!', 'Level up!') : context.tx('دستاورد جدید!', 'New achievement!'),
+    content: Column(mainAxisSize: MainAxisSize.min, children: [
+      if (o.levelUp)
+        Center(child: Text('${o.newLevel}', style: LuxType.latinDisplay.copyWith(color: p.isDark ? p.gold2 : p.gold3, fontSize: 44))),
+      for (final a in o.unlocked)
+        LuxListRow(
+          leading: Image.asset(AppAssets.achievement(a.asset), width: 44, cacheWidth: 120),
+          title: context.tx(a.nameFa, a.nameEn),
+          subtitle: '${context.tx(a.descFa, a.descEn)}  +${a.coinReward}',
+        ),
+    ]),
+    actions: <LuxDialogAction<void>>[LuxDialogAction<void>(context.tx('عالی', 'Great'), null)],
   );
 }
 

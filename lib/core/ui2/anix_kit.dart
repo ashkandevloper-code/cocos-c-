@@ -1,9 +1,10 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+
+import '../lux/lux.dart';
 import 'package:flutter/services.dart';
 
-import '../theme/nx_theme.dart';
 
 /// ANIX component kit: the owner's runtime art packs (buttons, toggles/checkboxes, modal + sheet
 /// panels, tooltips/popovers, navigation icons, game card shells, rank emblems, avatar set +
@@ -276,115 +277,24 @@ class AnixButton extends StatefulWidget {
 }
 
 class _AnixButtonState extends State<AnixButton> {
-  bool _down = false;
-  bool _focus = false;
-
-  String get _styleName => switch (widget.style) {
-        AnixButtonStyle.primary => 'primary',
-        AnixButtonStyle.secondary => 'secondary',
-        AnixButtonStyle.ghost => 'ghost',
-        AnixButtonStyle.destructive => 'destructive-neutral',
-      };
-
   @override
-  Widget build(BuildContext context) {
-    final bool enabled = widget.onTap != null && !widget.loading;
-    final bool large = widget.height >= 50;
-    final String size = large ? 'large' : 'compact';
-    // The pack's loading art bakes its spinner into the stretchable centre, so loading draws the
-    // normal art with a native spinner instead.
-    final String state = !enabled ? 'normal' : (_down ? 'pressed' : (_focus ? 'focused' : 'normal'));
-    final String asset = AnixAssets.button(widget.onTap == null && !widget.loading ? 'disabled' : _styleName, state, size);
-    // Canvas: large 320x96 (caps 48), compact 192x72 (caps 36).
-    final double canvasH = large ? 96 : 72;
-    final double cap = canvasH / 2;
-    final double canvasW = large ? 320 : 192;
-    final Rect slice = Rect.fromLTRB(cap, cap - 1, canvasW - cap, cap + 1);
-    final Color fg = switch (widget.style) {
-      AnixButtonStyle.ghost => const Color(0xFFBFF3FF),
-      _ => Colors.white,
-    };
-    final List<BoxShadow> glow = enabled && widget.style == AnixButtonStyle.primary
-        ? <BoxShadow>[
-            BoxShadow(
-                color: const Color(0xFF2FD3FF).withValues(alpha: _down ? 0.25 : 0.38),
-                blurRadius: widget.height * 0.42,
-                spreadRadius: -widget.height * 0.12),
-          ]
-        : const <BoxShadow>[];
-    final Widget face = AnimatedScale(
-      scale: _down ? 0.97 : 1,
-      duration: const Duration(milliseconds: 110),
-      child: Container(
-        height: widget.height,
-        constraints: BoxConstraints(minWidth: widget.height * (widget.loading ? 2.4 : 1.2)),
-        decoration: BoxDecoration(borderRadius: BorderRadius.circular(widget.height / 2), boxShadow: glow),
-        child: AnixNineSlice(
-          asset: asset,
-          center: slice,
-          scale: canvasH / widget.height,
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: widget.height * 0.34),
-            child: widget.loading
-            ? const SizedBox.shrink() // the loading art carries its own spinner
-            : Opacity(
-                opacity: enabled ? 1 : 0.55,
-                child: Row(mainAxisSize: MainAxisSize.min, mainAxisAlignment: MainAxisAlignment.center, children: <Widget>[
-                  if (widget.icon != null) ...<Widget>[
-                    Icon(widget.icon, color: fg, size: widget.fontSize + 4),
-                    const SizedBox(width: 8),
-                  ],
-                  Flexible(
-                    child: Text(widget.label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                            color: fg,
-                            fontWeight: FontWeight.w900,
-                            fontSize: widget.fontSize,
-                            letterSpacing: 0.8,
-                            shadows: const <Shadow>[Shadow(color: Color(0x99000000), blurRadius: 6)])),
-                  ),
-                ]),
-              ),
-          ),
-        ),
-      ),
-    );
-    return Semantics(
-      button: true,
-      enabled: enabled,
-      label: widget.label,
-      child: FocusableActionDetector(
-        enabled: enabled,
-        onShowFocusHighlight: (bool v) => setState(() => _focus = v),
-        actions: <Type, Action<Intent>>{
-          ActivateIntent: CallbackAction<ActivateIntent>(onInvoke: (_) {
-            widget.onTap?.call();
-            return null;
-          }),
+  Widget build(BuildContext context) => LuxButton(
+        label: widget.label,
+        onPressed: widget.onTap,
+        icon: widget.icon,
+        busy: widget.loading,
+        expand: true,
+        compact: widget.height < 46,
+        kind: switch (widget.style) {
+          AnixButtonStyle.primary => LuxButtonKind.gold,
+          AnixButtonStyle.secondary => LuxButtonKind.glass,
+          AnixButtonStyle.ghost => LuxButtonKind.ghost,
+          AnixButtonStyle.destructive => LuxButtonKind.danger,
         },
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTapDown: enabled ? (_) => setState(() => _down = true) : null,
-          onTapCancel: enabled ? () => setState(() => _down = false) : null,
-          onTapUp: enabled ? (_) => setState(() => _down = false) : null,
-          onTap: enabled
-              ? () {
-                  HapticFeedback.selectionClick();
-                  widget.onTap!();
-                }
-              : null,
-          child: face,
-        ),
-      ),
-    );
-  }
+      );
 }
 
-// ------------------------------------------------------------------------------------------ toggles
-
-/// Pack toggle (160x88 art, gold glow on the "on" state).
+/// Toggle switch (Station Luxe gold jewel toggle).
 class AnixToggle extends StatefulWidget {
   const AnixToggle({super.key, required this.value, required this.onChanged, this.width = 54});
   final bool value;
@@ -396,49 +306,11 @@ class AnixToggle extends StatefulWidget {
 }
 
 class _AnixToggleState extends State<AnixToggle> {
-  bool _down = false;
-
   @override
-  Widget build(BuildContext context) {
-    final bool enabled = widget.onChanged != null;
-    final String onOff = widget.value ? 'on' : 'off';
-    final String name = !enabled ? 'toggle-disabled-$onOff' : (_down ? 'toggle-pressed-$onOff' : 'toggle-$onOff');
-    final double h = widget.width * 88 / 160;
-    return Semantics(
-      toggled: widget.value,
-      enabled: enabled,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTapDown: enabled ? (_) => setState(() => _down = true) : null,
-        onTapCancel: enabled ? () => setState(() => _down = false) : null,
-        onTapUp: enabled ? (_) => setState(() => _down = false) : null,
-        onTap: enabled
-            ? () {
-                HapticFeedback.selectionClick();
-                widget.onChanged!(!widget.value);
-              }
-            : null,
-        child: SizedBox(
-          width: widget.width,
-          height: h,
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 160),
-            child: Image.asset(AnixAssets.toggle(name),
-                key: ValueKey<String>(name),
-                width: widget.width,
-                height: h,
-                fit: BoxFit.contain,
-                gaplessPlayback: true,
-                cacheWidth: (widget.width * 3).round(),
-                errorBuilder: (_, __, ___) => Switch(value: widget.value, onChanged: widget.onChanged)),
-          ),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => LuxToggle(value: widget.value, onChanged: widget.onChanged);
 }
 
-/// Pack checkbox.
+/// Checkbox (Station Luxe gold square).
 class AnixCheckbox extends StatefulWidget {
   const AnixCheckbox({super.key, required this.value, required this.onChanged, this.size = 30});
   final bool value;
@@ -450,40 +322,11 @@ class AnixCheckbox extends StatefulWidget {
 }
 
 class _AnixCheckboxState extends State<AnixCheckbox> {
-  bool _down = false;
-
   @override
-  Widget build(BuildContext context) {
-    final bool enabled = widget.onChanged != null;
-    final String c = widget.value ? 'checked' : 'unchecked';
-    final String name = !enabled ? 'checkbox-disabled-$c' : (_down ? 'checkbox-pressed-$c' : 'checkbox-$c');
-    return Semantics(
-      checked: widget.value,
-      enabled: enabled,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTapDown: enabled ? (_) => setState(() => _down = true) : null,
-        onTapCancel: enabled ? () => setState(() => _down = false) : null,
-        onTapUp: enabled ? (_) => setState(() => _down = false) : null,
-        onTap: enabled
-            ? () {
-                HapticFeedback.selectionClick();
-                widget.onChanged!(!widget.value);
-              }
-            : null,
-        child: Image.asset(AnixAssets.toggle(name),
-            width: widget.size,
-            height: widget.size,
-            fit: BoxFit.contain,
-            gaplessPlayback: true,
-            cacheWidth: (widget.size * 3).round(),
-            errorBuilder: (_, __, ___) => Checkbox(value: widget.value, onChanged: (bool? v) => widget.onChanged?.call(v ?? false))),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => LuxCheckbox(value: widget.value, onChanged: widget.onChanged);
 }
 
-/// Drop-in for SwitchListTile with the pack toggle.
+/// Drop-in for SwitchListTile with the Luxe toggle.
 class AnixSwitchTile extends StatelessWidget {
   const AnixSwitchTile({
     super.key,
@@ -563,7 +406,7 @@ class AnixCheckboxTile extends StatelessWidget {
 
 enum AnixPanelSize { small, medium, fullscreen, sheet }
 
-/// Modal / panel family frame, 9-slice. Content is forced onto the dark ANIX theme so it reads on the art.
+/// Modal / panel frame (Station Luxe glass card). [size] picks the corner radius.
 class AnixPanelFrame extends StatelessWidget {
   const AnixPanelFrame({
     super.key,
@@ -579,30 +422,30 @@ class AnixPanelFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (String name, double w, double h, double inset) = switch (size) {
-      AnixPanelSize.small => ('small', 320.0, 240.0, 36.0),
-      AnixPanelSize.medium => ('medium', 512.0, 384.0, 44.0),
-      AnixPanelSize.fullscreen => ('fullscreen', 768.0, 1024.0, 52.0),
-      AnixPanelSize.sheet => ('bottom-sheet', 768.0, 420.0, 52.0),
-    };
-    // Draw the art at 2x density so the frame rails stay thin on phones.
-    const double density = 2.0;
-    final Widget framed = AnixNineSlice(
-      asset: AnixAssets.modal(name, state),
-      center: Rect.fromLTRB(inset, inset, w - inset, h - inset),
-      scale: density,
-      child: Padding(padding: padding ?? EdgeInsets.all(inset / density + 6), child: child),
+    final LuxPalette p = LuxPalette.of(context);
+    final BorderRadius r = size == AnixPanelSize.sheet
+        ? const BorderRadius.vertical(top: Radius.circular(LuxRadius.sheet))
+        : BorderRadius.circular(size == AnixPanelSize.small ? LuxRadius.panel : LuxRadius.card);
+    return Container(
+      padding: padding ?? const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        borderRadius: r,
+        gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: p.isDark ? <Color>[const Color(0xFF1A1812), const Color(0xFF0C0C10)] : <Color>[p.panelHi, p.panel]),
+        border: Border.all(color: state == 'focused' ? p.gold : p.lineStrong),
+        boxShadow: <BoxShadow>[
+          BoxShadow(color: p.shadow.withValues(alpha: p.isDark ? .6 : .18), blurRadius: 50, offset: const Offset(0, 22), spreadRadius: -18),
+        ],
+      ),
+      child: child,
     );
-    return anixDarkContent(context, framed);
   }
 }
 
-/// Keeps text/icons light on the dark panel art, also in the light appearance mode.
-Widget anixDarkContent(BuildContext context, Widget child) {
-  final ThemeData t = Theme.of(context);
-  if (t.brightness == Brightness.dark) return child;
-  return Theme(data: buildNxTheme(), child: child);
-}
+/// Content on a Luxe panel follows the current day / night theme (kept for call-site compatibility).
+Widget anixDarkContent(BuildContext context, Widget child) => child;
 
 /// AlertDialog-compatible dialog drawn on the pack's medium panel.
 class AnixDialog extends StatelessWidget {
@@ -619,7 +462,6 @@ class AnixDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData t = Theme.of(context);
     return Dialog(
       backgroundColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,
@@ -635,8 +477,7 @@ class AnixDialog extends StatelessWidget {
             if (icon != null) ...<Widget>[Center(child: icon), const SizedBox(height: 10)],
             if (title != null)
               DefaultTextStyle.merge(
-                style: (t.textTheme.titleLarge ?? const TextStyle()).copyWith(
-                    fontWeight: FontWeight.w900, color: const Color(0xFFF4F0FF), fontSize: 19),
+                style: LuxType.title.copyWith(color: LuxPalette.of(context).ink, fontSize: 20),
                 child: title!,
               ),
             if (title != null && content != null) const SizedBox(height: 12),
@@ -644,7 +485,7 @@ class AnixDialog extends StatelessWidget {
               Flexible(
                 child: SingleChildScrollView(
                   child: DefaultTextStyle.merge(
-                    style: (t.textTheme.bodyMedium ?? const TextStyle()).copyWith(color: const Color(0xFFDCD6F2), height: 1.4),
+                    style: LuxType.body.copyWith(color: LuxPalette.of(context).mute),
                     child: content!,
                   ),
                 ),
@@ -692,14 +533,14 @@ Future<T?> showAnixSheet<T>({
     elevation: 0,
     builder: (BuildContext ctx) => AnixPanelFrame(
       size: AnixPanelSize.sheet,
-      padding: const EdgeInsets.fromLTRB(6, 10, 6, 0),
+      padding: EdgeInsets.fromLTRB(10, 10, 10, MediaQuery.paddingOf(ctx).bottom + 6),
       child: Column(mainAxisSize: MainAxisSize.min, children: <Widget>[
         if (showDragHandle ?? true)
           Container(
-            width: 44,
+            width: 40,
             height: 4,
-            margin: const EdgeInsets.only(top: 4, bottom: 6),
-            decoration: BoxDecoration(color: const Color(0x66FFF0BD), borderRadius: BorderRadius.circular(2)),
+            margin: const EdgeInsets.only(top: 4, bottom: 10),
+            decoration: BoxDecoration(color: LuxPalette.of(ctx).faint, borderRadius: BorderRadius.circular(2)),
           ),
         Flexible(child: builder(ctx)),
       ]),
@@ -713,11 +554,10 @@ Future<T?> showAnixSheet<T>({
 /// (tooltips open above their target). Only the rails left of the pointer stretch, so the pointer
 /// keeps its shape.
 /// (tooltip-theme.webp is tooltip-compact-bottom-normal at half size, so the slice is 1:1.)
-Decoration anixTooltipDecoration() => const BoxDecoration(
-      image: DecorationImage(
-        image: AssetImage('assets/ui/anix/tooltip/tooltip-theme.webp'),
-        centerSlice: Rect.fromLTRB(75, 13, 105, 26),
-      ),
+Decoration anixTooltipDecoration() => BoxDecoration(
+      color: const Color(0xF2141310),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: const Color(0x33D9B872)),
     );
 
 /// Popover bubble (medium popover, pointer at the bottom). Used for ORACLE / hub speech bubbles.
@@ -728,22 +568,21 @@ class AnixPopover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 360x220 art: body rows 4..178, pointer rows 178..214 around x=180.
-    // Stretch only columns 26..150 (left of the pointer) and rows 30..150.
-    const double scale = 2.4;
+    final LuxPalette p = LuxPalette.of(context);
     return ConstrainedBox(
-      constraints: BoxConstraints(minWidth: 336 / scale, maxWidth: maxWidth < 336 / scale ? 336 / scale : maxWidth),
-      child: AnixNineSlice(
-        asset: 'assets/ui/anix/tooltip/popover-medium-bottom-normal.webp',
-        center: const Rect.fromLTRB(26, 30, 150, 150),
-        scale: scale,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 11, 14, 11 + 42 / scale),
-          child: DefaultTextStyle.merge(
-            style: const TextStyle(fontSize: 12.5, height: 1.35, color: Color(0xFFF4F0FF)),
-            child: child,
-          ),
+      constraints: BoxConstraints(maxWidth: maxWidth),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 11, 14, 11),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: p.isDark ? <Color>[const Color(0xF21A1812), const Color(0xF20C0C10)] : <Color>[p.panelHi, p.panel]),
+          border: Border.all(color: p.lineStrong),
+          boxShadow: <BoxShadow>[BoxShadow(color: p.shadow.withValues(alpha: p.isDark ? .5 : .15), blurRadius: 24, offset: const Offset(0, 10))],
         ),
+        child: DefaultTextStyle.merge(style: LuxType.label.copyWith(color: p.ink, height: 1.4), child: child),
       ),
     );
   }
@@ -817,46 +656,39 @@ class AnixGameCard extends StatefulWidget {
 }
 
 class _AnixGameCardState extends State<AnixGameCard> {
-  bool _down = false;
-
   @override
   Widget build(BuildContext context) {
-    final String state = widget.onTap == null ? 'disabled' : (_down ? 'pressed' : 'normal');
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTapDown: widget.onTap == null ? null : (_) => setState(() => _down = true),
-      onTapCancel: widget.onTap == null ? null : () => setState(() => _down = false),
-      onTapUp: widget.onTap == null ? null : (_) => setState(() => _down = false),
-      onTap: widget.onTap == null
-          ? null
-          : () {
-              HapticFeedback.selectionClick();
-              widget.onTap!();
-            },
-      child: AnimatedScale(
-        scale: _down ? 0.97 : 1,
-        duration: const Duration(milliseconds: 110),
-        child: LayoutBuilder(builder: (BuildContext context, BoxConstraints c) {
-          final double w = c.maxWidth, h = c.maxHeight;
-          Rect at(Rect f) => Rect.fromLTRB(f.left * w, f.top * h, f.right * w, f.bottom * h);
-          final Rect win = at(AnixGameCard.window);
-          final Rect foot = at(AnixGameCard.footerRect);
-          return Stack(children: <Widget>[
-            Positioned.fromRect(
-              rect: win,
-              child: ClipRRect(borderRadius: BorderRadius.circular(w * 12 / 360), child: widget.art),
+    final LuxPalette p = LuxPalette.of(context);
+    // Station Luxe game card: art window on top (rounded, gold hairline), title footer below, glass body.
+    return LuxPress(
+      onTap: widget.onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(LuxRadius.panel),
+          gradient: p.glass,
+          color: p.isDark ? null : p.panel,
+          border: Border.all(color: p.line),
+          boxShadow: <BoxShadow>[
+            BoxShadow(color: p.shadow.withValues(alpha: p.isDark ? .5 : .12), blurRadius: 26, offset: const Offset(0, 14), spreadRadius: -12),
+          ],
+        ),
+        padding: const EdgeInsets.all(8),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: <Widget>[
+          Expanded(
+            flex: 64,
+            child: Container(
+              decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), border: Border.all(color: p.gold.withValues(alpha: .35))),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(19),
+                child: Stack(fit: StackFit.expand, children: <Widget>[
+                  widget.art,
+                  if (widget.overlay != null) widget.overlay!,
+                ]),
+              ),
             ),
-            Positioned.fill(
-              child: Image.asset(AnixAssets.card('portrait', state),
-                  fit: BoxFit.fill,
-                  gaplessPlayback: true,
-                  cacheWidth: (w * 2.4).round(),
-                  errorBuilder: (_, __, ___) => const SizedBox.shrink()),
-            ),
-            if (widget.overlay != null) Positioned.fromRect(rect: win, child: widget.overlay!),
-            Positioned.fromRect(rect: foot, child: widget.footer),
-          ]);
-        }),
+          ),
+          Expanded(flex: 26, child: widget.footer),
+        ]),
       ),
     );
   }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../lux/lux_theme.dart';
+import '../lux/lux_tokens.dart';
 import '../ui2/anix_kit.dart';
 import '../ui2/page_turn.dart';
 
@@ -7,23 +9,25 @@ import '../ui2/page_turn.dart';
 /// reads [NxThemeColors] from the active theme instead.
 class NxColors {
   NxColors._();
-  static const navy = Color(0xFF0A0F2C);
-  static const navyDeep = Color(0xFF050818);
-  static const navySoft = Color(0xFF141B45);
+  // ANIX PRO: the chrome tones follow Station Luxe night (warm black / champagne); game accents are unchanged.
+  static const navy = Color(0xFF12110D);
+  static const navyDeep = Color(0xFF07080C);
+  static const navySoft = Color(0xFF1C1A14);
   static const electricBlue = Color(0xFF00C2FF);
   static const violet = Color(0xFF7B3FF2);
-  static const iceWhite = Color(0xFFEAF6FF);
+  static const iceWhite = Color(0xFFF4EAD2);
   static const turquoise = Color(0xFF2EE6D6);
-  static const gold = Color(0xFFFFC857);
+  static const gold = Color(0xFFD9B872);
   static const pink = Color(0xFFFF4FA3);
   static const danger = Color(0xFFFF5A6E);
   static const success = Color(0xFF3DDC97);
   static const glass = Color(0x22FFFFFF);
-  static const glassBorder = Color(0x44FFFFFF);
-  static const textDim = Color(0xB3EAF6FF);
+  static const glassBorder = Color(0x44D9B872);
+  static const textDim = Color(0xB3F4EAD2);
 }
 
-enum NxAppearanceMode { dark, light }
+/// Day / night: follow the phone (system), always night (dark) or always day (light). Persisted in AppSettings.
+enum NxAppearanceMode { dark, light, system }
 
 enum NxVisualTheme { gold, neon }
 
@@ -79,16 +83,17 @@ class NxThemeColors extends ThemeExtension<NxThemeColors> {
     muted: Color(0xFFB9AE95),
   );
 
+  /// Station Luxe day (ivory / bronze), same roles as [neon].
   static const neonLight = NxThemeColors(
-    accent: Color(0xFF087EA4),
-    accentSecondary: Color(0xFF6D35B5),
-    background: Color(0xFFF5F3FF),
-    backgroundMid: Color(0xFFEAE4FF),
-    surface: Color(0xFFFFFFFF),
-    surfaceRaised: Color(0xFFF0ECFF),
-    border: Color(0xFF9A7AD8),
-    text: Color(0xFF171329),
-    muted: Color(0xFF625B78),
+    accent: Color(0xFFA77B2C),
+    accentSecondary: Color(0xFF6E4F17),
+    background: Color(0xFFF6F1E6),
+    backgroundMid: Color(0xFFEDE3CF),
+    surface: Color(0xEBFFFCF5),
+    surfaceRaised: Color(0xFFFFFFFF),
+    border: Color(0xFF6E4F17),
+    text: Color(0xFF221C12),
+    muted: Color(0xFF6B5E48),
   );
 
   static const goldLight = NxThemeColors(
@@ -220,17 +225,20 @@ class NxMotion {
 }
 
 /// The NX2 redesign ships one skin: cosmic neon. [style] is kept for API compatibility.
+/// ANIX PRO: the app theme is the Station Luxe theme (lib/core/lux): night = black / gold, day = ivory / bronze.
+/// [style] is kept for API compatibility. [NxAppearanceMode.system] builds the night theme here; MaterialApp picks
+/// day / night itself through themeMode.
 ThemeData buildNxTheme([
   NxVisualTheme style = NxVisualTheme.neon,
   NxAppearanceMode appearance = NxAppearanceMode.dark,
-]) => _buildTheme(
-      appearance == NxAppearanceMode.light
-          ? (style == NxVisualTheme.gold
-              ? NxThemeColors.goldLight
-              : NxThemeColors.neonLight)
-          : (style == NxVisualTheme.gold ? NxThemeColors.gold : NxThemeColors.neon),
-      appearance,
-    );
+]) => buildLuxTheme(appearance == NxAppearanceMode.light ? LuxPalette.day : LuxPalette.night);
+
+/// MaterialApp.themeMode for a stored appearance.
+ThemeMode nxThemeMode(NxAppearanceMode m) => switch (m) {
+      NxAppearanceMode.dark => ThemeMode.dark,
+      NxAppearanceMode.light => ThemeMode.light,
+      NxAppearanceMode.system => ThemeMode.system,
+    };
 
 /// Preserve the original Finger Soccer field, ball and player-disc palette.
 ThemeData buildNxGameplayTheme() =>

@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/lux/lux.dart';
 import '../../core/profile/profile_service.dart';
 import '../../core/settings/app_settings.dart';
-import '../../core/ui2/luxe.dart';
 import '../../core/ui2/nx2_widgets.dart';
 import '../../core/widgets/nx_widgets.dart';
+import '../../features/admin/admin_access.dart';
 import 'luxe_worlds.dart';
 
 /// Opens a Station item: a real route, or a real in-app action.
@@ -25,196 +26,155 @@ Future<void> luxeClaimDaily(BuildContext context, WidgetRef ref) async {
   final AwardOutcome? o = p.claimDaily();
   if (!context.mounted) return;
   if (o == null) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(context.tx('جایزه‌ی امروز را گرفته‌ای. فردا برگرد!', 'Already claimed today. Come back tomorrow!'))));
+    LuxToast.show(context, context.tx('جایزه‌ی امروز را گرفته‌ای. فردا برگرد!', 'Already claimed today. Come back tomorrow!'),
+        icon: Icons.schedule_rounded);
     return;
   }
   await showAwardOutcome(context, o);
 }
 
-/// A Station world: glyph header, gold tabs and a grid of glass tiles (Station Luxe "world" view).
+Nx2Tab luxeDockTab(String k) => switch (k) {
+      'games' => Nx2Tab.games,
+      'social' || 'chat' => Nx2Tab.social,
+      'compete' || 'tournaments' || 'events' => Nx2Tab.tournaments,
+      'profile' => Nx2Tab.profile,
+      'shop' => Nx2Tab.shop,
+      'oracle' => Nx2Tab.oracle,
+      'rewards' => Nx2Tab.rewards,
+      _ => Nx2Tab.home,
+    };
+
+/// A Station (category hub): medallion header, gold pill tabs, and a two-column grid of glass tiles. Used for Games,
+/// Social, Compete, Shop and Profile; every tile opens a real screen.
 class LuxeStationPage extends ConsumerStatefulWidget {
-  const LuxeStationPage({super.key, required this.k});
+  const LuxeStationPage({super.key, required this.k, this.initialTab = 0});
   final String k;
+  final int initialTab;
 
   @override
   ConsumerState<LuxeStationPage> createState() => _LuxeStationPageState();
 }
 
 class _LuxeStationPageState extends ConsumerState<LuxeStationPage> {
-  int _tab = 0;
+  late int _tab = widget.initialTab;
 
   @override
   Widget build(BuildContext context) {
     final LuxeWorld? w = luxeWorld(widget.k);
     if (w == null) {
-      return Scaffold(
-        backgroundColor: Luxe.bg,
-        body: Center(
-          child: Text(context.tx('این بخش پیدا نشد', 'Section not found'), style: const TextStyle(color: Luxe.ink)),
-        ),
+      return LuxPage(
+        title: context.tx('پیدا نشد', 'Not found'),
+        body: LuxEmpty(title: context.tx('این بخش پیدا نشد', 'Section not found'), icon: Icons.explore_off_rounded),
       );
     }
-    final List<LuxeItem> items = w.items.where((LuxeItem i) => i.tab == _tab).toList();
+    final bool staff = ref.watch(adminAccessProvider).isAdmin;
     final List<String> tabs = context.isFa ? w.tabsFa : w.tabsEn;
-    return Scaffold(
-      backgroundColor: Luxe.bg,
-      extendBody: true,
-      bottomNavigationBar: Nx2Dock(current: _dockTab(w.k)),
-      body: LuxeScene(
-        artOpacity: 0.3,
-        tint: w.color,
-        child: SafeArea(
-          bottom: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: <Widget>[
-              Row(children: <Widget>[
-                Container(
-                  width: 54,
-                  height: 54,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: w.color.withValues(alpha: 0.45)),
-                    gradient: RadialGradient(
-                        center: const Alignment(-0.3, -0.4),
-                        colors: <Color>[w.color.withValues(alpha: 0.3), Colors.transparent]),
-                  ),
-                  padding: const EdgeInsets.all(6),
-                  child: Image.asset(Luxe.icon(w.icon), cacheWidth: 140, errorBuilder: (_, __, ___) => const SizedBox()),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: <Widget>[
-                    Text(w.fa, style: const TextStyle(fontSize: 21, color: Luxe.ink)),
-                    Text(w.en, style: Luxe.latin),
-                  ]),
-                ),
-                LuxePress(
-                  semantics: context.tx('بازگشت', 'Back'),
-                  onTap: () => context.canPop() ? context.pop() : context.go('/hub'),
-                  child: const LuxeGlass(
-                    radius: 99,
-                    padding: EdgeInsets.all(11),
-                    child: Icon(Icons.close_rounded, size: 18, color: Luxe.ink),
-                  ),
-                ),
+    final int tab = _tab.clamp(0, tabs.length - 1).toInt();
+    final List<LuxeItem> items = w.items.where((LuxeItem i) => i.tab == tab && (!i.staffOnly || staff)).toList();
+    final LuxPalette p = LuxPalette.of(context);
+    return LuxPage(
+      key: ValueKey<String>('station-${w.k}'),
+      title: context.tx(w.fa, w.en),
+      kicker: w.en,
+      iconAsset: 'assets/luxe/icons/${w.icon}.webp',
+      accent: w.color,
+      showBack: Navigator.of(context).canPop(),
+      bottom: LuxDock(current: luxeDockTab(w.k)),
+      tabs: tabs.length > 1
+          ? LuxPillTabs(labels: tabs, index: tab, onChanged: (int i) => setState(() => _tab = i))
+          : null,
+      body: AnimatedSwitcher(
+        duration: LuxMotion.normal,
+        switchInCurve: LuxMotion.ease,
+        transitionBuilder: (Widget c, Animation<double> a) => FadeTransition(
+          opacity: a,
+          child: SlideTransition(position: Tween<Offset>(begin: const Offset(0, .03), end: Offset.zero).animate(a), child: c),
+        ),
+        child: ListView(
+          key: ValueKey<int>(tab),
+          padding: const EdgeInsets.fromLTRB(LuxSpace.page, 6, LuxSpace.page, 24),
+          physics: const BouncingScrollPhysics(),
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12, left: 4, right: 4),
+              child: Text(context.tx(w.tagFa, w.tagEn), style: LuxType.label.copyWith(color: p.mute)),
+            ),
+            if (items.isEmpty)
+              LuxEmpty(title: context.tx('چیزی اینجا نیست', 'Nothing here yet'), icon: Icons.inbox_rounded)
+            else
+              LuxTileGrid(children: <Widget>[
+                for (int i = 0; i < items.length; i++)
+                  LuxTile(
+                    key: ValueKey<String>('station-item-${items[i].route ?? items[i].action}'),
+                    index: i,
+                    title: context.tx(items[i].fa, items[i].en),
+                    subtitle: items[i].subFa == null ? null : context.tx(items[i].subFa!, items[i].subEn ?? items[i].subFa!),
+                    asset: items[i].image,
+                    accent: w.color,
+                    badge: items[i].online ? 'ONLINE' : (items[i].staffOnly ? 'STAFF' : null),
+                    icon: Icons.auto_awesome_rounded,
+                    onTap: () => luxeOpen(context, ref, items[i]),
+                  )._withMedallion(items[i].icon),
               ]),
-              const SizedBox(height: 14),
-              if (tabs.length > 1)
-                SizedBox(
-                  height: 38,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: tabs.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 8),
-                    itemBuilder: (BuildContext ctx, int i) {
-                      final bool on = i == _tab;
-                      return LuxePress(
-                        onTap: () => setState(() => _tab = i),
-                        semantics: tabs[i],
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 380),
-                          curve: Luxe.ease,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(99),
-                            gradient: on ? Luxe.goldGrad : null,
-                            border: Border.all(color: on ? Colors.transparent : Luxe.line),
-                            boxShadow: on
-                                ? const <BoxShadow>[BoxShadow(color: Color(0x88D9B872), blurRadius: 22, spreadRadius: -4)]
-                                : const <BoxShadow>[],
-                          ),
-                          child: Text(tabs[i],
-                              style: TextStyle(fontSize: 13, color: on ? const Color(0xFF1A1408) : Luxe.mute)),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              const SizedBox(height: 14),
-              Expanded(
-                child: items.isEmpty
-                    ? Center(
-                        child: Text(context.tx('چیزی اینجا نیست', 'Nothing here yet'),
-                            style: const TextStyle(color: Luxe.mute)))
-                    : GridView.builder(
-                        padding: const EdgeInsets.only(bottom: 150, top: 2),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2, mainAxisSpacing: 14, crossAxisSpacing: 14, childAspectRatio: 0.86),
-                        itemCount: items.length,
-                        itemBuilder: (BuildContext ctx, int i) => _Tile(item: items[i], color: w.color),
-                      ),
-              ),
-            ]),
-          ),
+          ],
         ),
       ),
     );
   }
-
-  Nx2Tab? _dockTab(String k) => switch (k) {
-        'games' => Nx2Tab.games,
-        'chat' => Nx2Tab.social,
-        'tournaments' => Nx2Tab.tournaments,
-        'shop' => Nx2Tab.shop,
-        'profile' => Nx2Tab.profile,
-        'oracle' => Nx2Tab.oracle,
-        'rewards' || 'events' => Nx2Tab.rewards,
-        _ => null,
-      };
 }
 
-class _Tile extends ConsumerWidget {
-  const _Tile({required this.item, required this.color});
-  final LuxeItem item;
-  final Color color;
+extension on LuxTile {
+  /// Tiles that use the owner's luxe icon art show it as a jewel medallion instead of a plain orb.
+  Widget _withMedallion(String? icon) {
+    if (icon == null) return this;
+    return _MedallionTile(tile: this, icon: icon);
+  }
+}
 
+class _MedallionTile extends StatelessWidget {
+  const _MedallionTile({required this.tile, required this.icon});
+  final LuxTile tile;
+  final String icon;
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final String title = context.tx(item.fa, item.en);
-    return LuxePress(
-      semantics: title,
-      onTap: () => luxeOpen(context, ref, item),
-      child: LuxeGlass(
-        radius: 26,
-        padding: const EdgeInsets.fromLTRB(10, 14, 10, 12),
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: <Widget>[
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                boxShadow: <BoxShadow>[BoxShadow(color: color.withValues(alpha: 0.28), blurRadius: 30, spreadRadius: -8)],
+  Widget build(BuildContext context) {
+    final LuxPalette p = LuxPalette.of(context);
+    final Widget card = LuxPanel(
+      onTap: tile.onTap,
+      padding: const EdgeInsets.fromLTRB(12, 18, 12, 16),
+      child: Column(mainAxisSize: MainAxisSize.min, children: <Widget>[
+        Stack(clipBehavior: Clip.none, children: <Widget>[
+          LuxMedallion(asset: 'assets/luxe/icons/$icon.webp', size: 70, glow: tile.accent),
+          if (tile.badge != null)
+            PositionedDirectional(
+              top: -4,
+              end: -14,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(gradient: p.goldGradient, borderRadius: BorderRadius.circular(99)),
+                child: Text(tile.badge!, style: LuxType.caption.copyWith(color: p.onGold, fontWeight: FontWeight.w700, fontSize: 9.5)),
               ),
-              child: Image.asset(item.image ?? Luxe.icon(item.icon ?? 'r4c5'),
-                  fit: BoxFit.contain, cacheWidth: 260, errorBuilder: (_, __, ___) => const SizedBox()),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 14.5, color: Luxe.ink, fontWeight: FontWeight.w500)),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List<Widget>.generate(4, (int i) {
-              final bool on = i < item.rarity;
-              return Container(
-                width: 5,
-                height: 5,
-                margin: const EdgeInsets.symmetric(horizontal: 2),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: on ? color : const Color(0x33F6E7BD),
-                  boxShadow: on ? <BoxShadow>[BoxShadow(color: color, blurRadius: 6)] : null,
-                ),
-              );
-            }),
-          ),
         ]),
-      ),
+        const SizedBox(height: 12),
+        Text(tile.title,
+            textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: LuxType.bodyStrong.copyWith(color: p.ink, fontSize: 14.5)),
+        if (tile.subtitle != null) ...<Widget>[
+          const SizedBox(height: 3),
+          Text(tile.subtitle!,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: LuxType.caption.copyWith(color: p.mute, fontSize: 10.5)),
+        ],
+      ]),
+    );
+    if (LuxMotion.reduced(context)) return card;
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: 1),
+      duration: Duration(milliseconds: 520 + 70 * tile.index.clamp(0, 10)),
+      curve: LuxMotion.ease,
+      builder: (_, double t, Widget? c) => Opacity(opacity: t, child: Transform.translate(offset: Offset(0, 16 * (1 - t)), child: c)),
+      child: card,
     );
   }
 }

@@ -94,7 +94,12 @@ class _NexoraAppState extends ConsumerState<NexoraApp> {
     return MaterialApp.router(
       title: 'ANIX PRO',
       debugShowCheckedModeBanner: false,
-      theme: buildNxTheme(settings.visualTheme),
+      // Station Luxe day / night (Settings -> appearance: system / night / day).
+      theme: buildNxTheme(settings.visualTheme, NxAppearanceMode.light),
+      darkTheme: buildNxTheme(settings.visualTheme, NxAppearanceMode.dark),
+      themeMode: settings.themeMode,
+      themeAnimationDuration: const Duration(milliseconds: 420),
+      themeAnimationCurve: Curves.easeOutCubic,
       locale: settings.locale,
       supportedLocales: const [Locale('fa'), Locale('en')],
       localizationsDelegates: const [

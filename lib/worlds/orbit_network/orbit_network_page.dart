@@ -12,7 +12,10 @@ import 'ui/orbit_tabs.dart';
 import '../../core/ui2/anix_kit.dart';
 /// ORBIT NETWORK — the messenger world (offline-first).
 class OrbitNetworkPage extends ConsumerStatefulWidget {
-  const OrbitNetworkPage({super.key});
+  const OrbitNetworkPage({super.key, this.initialTab = 0});
+
+  /// 0 chats, 1 calls, 2 friends / contacts.
+  final int initialTab;
 
   @override
   ConsumerState<OrbitNetworkPage> createState() => _OrbitNetworkPageState();
@@ -20,7 +23,7 @@ class OrbitNetworkPage extends ConsumerStatefulWidget {
 
 class _OrbitNetworkPageState extends ConsumerState<OrbitNetworkPage>
     with WidgetsBindingObserver {
-  int _tab = 0;
+  late int _tab = widget.initialTab;
 
   @override
   void initState() {

@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -28,7 +29,12 @@ class AppSettings extends ChangeNotifier {
       _visualTheme = NxVisualTheme.gold;
     }
     _music = _store.getBool(_kMusic) ?? true;
-    _musicVolume = (_store.getInt(_kMusicVol) ?? 60).clamp(0, 100) / 100.0;
+    // ANIX PRO: background music is soft by default (30 %). One-time move of the old untouched default (60) to it.
+    if (_store.getBool(_kMusicSoft) != true) {
+      if (_store.getInt(_kMusicVol) == 60) _store.setInt(_kMusicVol, kDefaultMusicVolume);
+      _store.setBool(_kMusicSoft, true);
+    }
+    _musicVolume = (_store.getInt(_kMusicVol) ?? kDefaultMusicVolume).clamp(0, 100) / 100.0;
     _sfxVolume = (_store.getInt(_kSfxVol) ?? 80).clamp(0, 100) / 100.0;
     _sound = _store.getBool(_kSound) ?? true;
     _haptics = _store.getBool(_kHaptics) ?? true;
@@ -76,6 +82,10 @@ class AppSettings extends ChangeNotifier {
   static const _kMusicVol = 'settings.music_volume';
   static const _kSfxVol = 'settings.sfx_volume';
   static const _kAppearance = 'settings.appearance';
+  static const _kMusicSoft = 'settings.music_soft_v1';
+
+  /// Default background-music volume in percent (soft).
+  static const int kDefaultMusicVolume = 30;
 
   late GraphicsQuality _quality;
   late bool _reducedMotion;
@@ -123,6 +133,9 @@ class AppSettings extends ChangeNotifier {
   String get languageCode => _languageCode;
   NxVisualTheme get visualTheme => _visualTheme;
   NxAppearanceMode get appearanceMode => _appearanceMode;
+
+  /// MaterialApp.themeMode for the stored day / night choice.
+  ThemeMode get themeMode => nxThemeMode(_appearanceMode);
   bool get isFa => _languageCode == 'fa';
   Locale get locale => Locale(_languageCode);
   bool get sound => _sound;
