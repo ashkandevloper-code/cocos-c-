@@ -9,45 +9,74 @@ import '../ui2/oracle_buddy.dart' show OracleBus;
 
 /// A recorded activity (shown in Personal Orbit timeline).
 class ActivityEntry {
-  ActivityEntry({required this.at, required this.kind, required this.textFa, required this.textEn, this.xp = 0});
+  ActivityEntry({
+    required this.at,
+    required this.kind,
+    required this.textFa,
+    required this.textEn,
+    this.xp = 0,
+  });
   final DateTime at;
   final String kind;
   final String textFa;
   final String textEn;
   final int xp;
 
-  Map<String, dynamic> toJson() =>
-      {'at': at.millisecondsSinceEpoch, 'kind': kind, 'fa': textFa, 'en': textEn, 'xp': xp};
+  Map<String, dynamic> toJson() => {
+    'at': at.millisecondsSinceEpoch,
+    'kind': kind,
+    'fa': textFa,
+    'en': textEn,
+    'xp': xp,
+  };
   static ActivityEntry fromJson(Map<String, dynamic> j) => ActivityEntry(
-        at: DateTime.fromMillisecondsSinceEpoch((j['at'] as num).toInt()),
-        kind: j['kind'] as String? ?? 'misc',
-        textFa: j['fa'] as String? ?? '',
-        textEn: j['en'] as String? ?? '',
-        xp: (j['xp'] as num?)?.toInt() ?? 0,
-      );
+    at: DateTime.fromMillisecondsSinceEpoch((j['at'] as num).toInt()),
+    kind: j['kind'] as String? ?? 'misc',
+    textFa: j['fa'] as String? ?? '',
+    textEn: j['en'] as String? ?? '',
+    xp: (j['xp'] as num?)?.toInt() ?? 0,
+  );
 }
 
 /// Per-game statistics.
 class GameStats {
-  GameStats({this.played = 0, this.won = 0, this.lost = 0, this.draw = 0, this.best = 0});
+  GameStats({
+    this.played = 0,
+    this.won = 0,
+    this.lost = 0,
+    this.draw = 0,
+    this.best = 0,
+  });
   int played;
   int won;
   int lost;
   int draw;
   int best;
-  Map<String, dynamic> toJson() => {'p': played, 'w': won, 'l': lost, 'd': draw, 'b': best};
+  Map<String, dynamic> toJson() => {
+    'p': played,
+    'w': won,
+    'l': lost,
+    'd': draw,
+    'b': best,
+  };
   static GameStats fromJson(Map<String, dynamic> j) => GameStats(
-        played: (j['p'] as num?)?.toInt() ?? 0,
-        won: (j['w'] as num?)?.toInt() ?? 0,
-        lost: (j['l'] as num?)?.toInt() ?? 0,
-        draw: (j['d'] as num?)?.toInt() ?? 0,
-        best: (j['b'] as num?)?.toInt() ?? 0,
-      );
+    played: (j['p'] as num?)?.toInt() ?? 0,
+    won: (j['w'] as num?)?.toInt() ?? 0,
+    lost: (j['l'] as num?)?.toInt() ?? 0,
+    draw: (j['d'] as num?)?.toInt() ?? 0,
+    best: (j['b'] as num?)?.toInt() ?? 0,
+  );
 }
 
 /// Result of an award call, so UI can celebrate level-ups / unlocks.
 class AwardOutcome {
-  AwardOutcome({required this.xp, required this.coins, required this.levelUp, required this.newLevel, required this.unlocked});
+  AwardOutcome({
+    required this.xp,
+    required this.coins,
+    required this.levelUp,
+    required this.newLevel,
+    required this.unlocked,
+  });
   final int xp;
   final int coins;
   final bool levelUp;
@@ -82,6 +111,7 @@ class ProfileService extends ChangeNotifier {
   String portrait = '01-vanguard';
   int xp = 0;
   int coins = 0;
+
   /// Gems (الماس): the premium currency. Server-owned (public.profiles.gems): only RPCs change it (welcome / daily
   /// gems, tournament prizes, admin grants, team purchases); the app just mirrors the balance.
   int gems = 0;
@@ -89,9 +119,12 @@ class ProfileService extends ChangeNotifier {
   final Set<String> inventory = {};
   final Set<String> achievements = {};
   final Map<String, GameStats> stats = {};
+  final Set<String> _recordedOnlineMatches = <String>{};
   final List<ActivityEntry> activity = [];
-  final Map<String, int> counters = {}; // generic counters for achievements/challenges
-  final Map<String, Map<String, dynamic>> decorLayout = {}; // decorId -> {x,y,s}
+  final Map<String, int> counters =
+      {}; // generic counters for achievements/challenges
+  final Map<String, Map<String, dynamic>> decorLayout =
+      {}; // decorId -> {x,y,s}
   String orbitTheme = 'aurora';
   DateTime createdAt = DateTime.now();
   String _xpDay = '';
@@ -106,7 +139,13 @@ class ProfileService extends ChangeNotifier {
     if (j == null) {
       explorerId = _newExplorerId();
       coins = 500; // starter credits, earned/spent only through real actions afterwards
-      inventory.addAll(const ['puck_nx_green', 'puck_tech_nx', 'theme_aurora', 'striker_soccer', 'cue_classic']);
+      inventory.addAll(const [
+        'puck_nx_green',
+        'puck_tech_nx',
+        'theme_aurora',
+        'striker_soccer',
+        'cue_classic',
+      ]);
       equipped['puck'] = 'puck_nx_green';
       equipped['striker'] = 'striker_soccer';
       equipped['cue'] = 'cue_classic';
@@ -128,15 +167,30 @@ class ProfileService extends ChangeNotifier {
     streak = (j['streak'] as num?)?.toInt() ?? 0;
     _xpDay = j['xpDay'] as String? ?? '';
     _xpToday = (j['xpToday'] as num?)?.toInt() ?? 0;
-    createdAt = DateTime.fromMillisecondsSinceEpoch((j['created'] as num?)?.toInt() ?? DateTime.now().millisecondsSinceEpoch);
+    createdAt = DateTime.fromMillisecondsSinceEpoch(
+      (j['created'] as num?)?.toInt() ?? DateTime.now().millisecondsSinceEpoch,
+    );
     (j['equipped'] as Map?)?.forEach((k, v) => equipped['$k'] = '$v');
     inventory.addAll(((j['inv'] as List?) ?? const []).map((e) => '$e'));
     achievements.addAll(((j['ach'] as List?) ?? const []).map((e) => '$e'));
-    (j['stats'] as Map?)?.forEach((k, v) => stats['$k'] = GameStats.fromJson(Map<String, dynamic>.from(v as Map)));
-    (j['counters'] as Map?)?.forEach((k, v) => counters['$k'] = (v as num).toInt());
-    (j['decor'] as Map?)?.forEach((k, v) => decorLayout['$k'] = Map<String, dynamic>.from(v as Map));
-    activity.addAll(((j['act'] as List?) ?? const [])
-        .map((e) => ActivityEntry.fromJson(Map<String, dynamic>.from(e as Map))));
+    (j['stats'] as Map?)?.forEach(
+      (k, v) =>
+          stats['$k'] = GameStats.fromJson(Map<String, dynamic>.from(v as Map)),
+    );
+    _recordedOnlineMatches.addAll(
+      ((j['onlineMatches'] as List?) ?? const <dynamic>[]).whereType<String>(),
+    );
+    (j['counters'] as Map?)?.forEach(
+      (k, v) => counters['$k'] = (v as num).toInt(),
+    );
+    (j['decor'] as Map?)?.forEach(
+      (k, v) => decorLayout['$k'] = Map<String, dynamic>.from(v as Map),
+    );
+    activity.addAll(
+      ((j['act'] as List?) ?? const []).map(
+        (e) => ActivityEntry.fromJson(Map<String, dynamic>.from(e as Map)),
+      ),
+    );
   }
 
   Future<void> _save() {
@@ -145,38 +199,39 @@ class ProfileService extends ChangeNotifier {
   }
 
   Future<void> _saveLocal() => _store.setJson(_key, {
-        'id': explorerId,
-        'username': username,
-        'bio': bio,
-        'avatar': avatarCore,
-        'avatarUrl': avatarUrl,
-        'avatarPath': avatarPath,
-        'portrait': portrait,
-        'xp': xp,
-        'coins': coins,
-        'gems': gems,
-        'orbitTheme': orbitTheme,
-        'claimedDaily': claimedDaily,
-        'streak': streak,
-        'xpDay': _xpDay,
-        'xpToday': _xpToday,
-        'created': createdAt.millisecondsSinceEpoch,
-        'equipped': equipped,
-        'inv': inventory.toList(),
-        'ach': achievements.toList(),
-        'stats': stats.map((k, v) => MapEntry(k, v.toJson())),
-        'counters': counters,
-        'decor': decorLayout,
-        'act': activity.take(200).map((e) => e.toJson()).toList(),
-      });
+    'id': explorerId,
+    'username': username,
+    'bio': bio,
+    'avatar': avatarCore,
+    'avatarUrl': avatarUrl,
+    'avatarPath': avatarPath,
+    'portrait': portrait,
+    'xp': xp,
+    'coins': coins,
+    'gems': gems,
+    'orbitTheme': orbitTheme,
+    'claimedDaily': claimedDaily,
+    'streak': streak,
+    'xpDay': _xpDay,
+    'xpToday': _xpToday,
+    'created': createdAt.millisecondsSinceEpoch,
+    'equipped': equipped,
+    'inv': inventory.toList(),
+    'ach': achievements.toList(),
+    'stats': stats.map((k, v) => MapEntry(k, v.toJson())),
+    'onlineMatches': _recordedOnlineMatches.toList(),
+    'counters': counters,
+    'decor': decorLayout,
+    'act': activity.take(200).map((e) => e.toJson()).toList(),
+  });
 
   static String _newExplorerId() {
     final r = Random.secure();
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    String block() => List.generate(4, (_) => chars[r.nextInt(chars.length)]).join();
+    String block() =>
+        List.generate(4, (_) => chars[r.nextInt(chars.length)]).join();
     return 'NX-${block()}-${block()}';
   }
-
 
   // ---------- Cloud seam (online build) ----------
   /// Set by CloudProfileSync: receives every server-relevant change (award / purchase).
@@ -189,7 +244,9 @@ class ProfileService extends ChangeNotifier {
   void Function(String name)? onNameChanged;
 
   String _idemKey(String event) {
-    if (event.startsWith('world.first_visit.') || event.startsWith('achievement.') || event.startsWith('challenge.')) {
+    if (event.startsWith('world.first_visit.') ||
+        event.startsWith('achievement.') ||
+        event.startsWith('challenge.')) {
       return 'once:$event';
     }
     if (event == 'daily') return 'daily:${_today()}';
@@ -198,23 +255,28 @@ class ProfileService extends ChangeNotifier {
 
   /// Everything except the server-owned wallet (xp/coins live in public.profiles).
   Map<String, dynamic> cloudBlob() => <String, dynamic>{
-        'bio': bio,
-        'portrait': portrait,
-        'orbitTheme': orbitTheme,
-        'claimedDaily': claimedDaily,
-        'streak': streak,
-        'created': createdAt.millisecondsSinceEpoch,
-        'equipped': Map<String, String>.from(equipped),
-        'inv': inventory.toList(),
-        'ach': achievements.toList(),
-        'stats': stats.map((k, v) => MapEntry(k, v.toJson())),
-        'counters': Map<String, int>.from(counters),
-        'decor': decorLayout,
-        'act': activity.take(60).map((e) => e.toJson()).toList(),
-      };
+    'bio': bio,
+    'portrait': portrait,
+    'orbitTheme': orbitTheme,
+    'claimedDaily': claimedDaily,
+    'streak': streak,
+    'created': createdAt.millisecondsSinceEpoch,
+    'equipped': Map<String, String>.from(equipped),
+    'inv': inventory.toList(),
+    'ach': achievements.toList(),
+    'stats': stats.map((k, v) => MapEntry(k, v.toJson())),
+    'counters': Map<String, int>.from(counters),
+    'decor': decorLayout,
+    'act': activity.take(60).map((e) => e.toJson()).toList(),
+  };
 
   /// Apply a server blob. [replace] = another account signed in on this phone.
-  void applyCloudBlob(Map<String, dynamic> j, {required bool replace, String? serverName, String? avatar}) {
+  void applyCloudBlob(
+    Map<String, dynamic> j, {
+    required bool replace,
+    String? serverName,
+    String? avatar,
+  }) {
     if (replace) {
       equipped.clear();
       inventory.clear();
@@ -236,13 +298,21 @@ class ProfileService extends ChangeNotifier {
       final String cd = j['claimedDaily'] as String? ?? '';
       if (cd.compareTo(claimedDaily) > 0) claimedDaily = cd;
     }
-    if (serverName != null && serverName.isNotEmpty && (replace || username.isEmpty)) username = serverName;
+    if (serverName != null &&
+        serverName.isNotEmpty &&
+        (replace || username.isEmpty)) {
+      username = serverName;
+    }
     if (avatar != null && avatar.isNotEmpty && replace) avatarCore = avatar;
-    (j['equipped'] as Map?)?.forEach((k, v) => equipped.putIfAbsent('$k', () => '$v'));
+    (j['equipped'] as Map?)?.forEach(
+      (k, v) => equipped.putIfAbsent('$k', () => '$v'),
+    );
     inventory.addAll(((j['inv'] as List?) ?? const []).map((e) => '$e'));
     achievements.addAll(((j['ach'] as List?) ?? const []).map((e) => '$e'));
     (j['stats'] as Map?)?.forEach((k, v) {
-      final GameStats r = GameStats.fromJson(Map<String, dynamic>.from(v as Map));
+      final GameStats r = GameStats.fromJson(
+        Map<String, dynamic>.from(v as Map),
+      );
       final GameStats l = stats.putIfAbsent('$k', () => GameStats());
       l.played = max(l.played, r.played);
       l.won = max(l.won, r.won);
@@ -250,11 +320,21 @@ class ProfileService extends ChangeNotifier {
       l.draw = max(l.draw, r.draw);
       l.best = max(l.best, r.best);
     });
-    (j['counters'] as Map?)?.forEach((k, v) => counters['$k'] = max(counters['$k'] ?? 0, (v as num).toInt()));
-    (j['decor'] as Map?)?.forEach((k, v) => decorLayout.putIfAbsent('$k', () => Map<String, dynamic>.from(v as Map)));
+    (j['counters'] as Map?)?.forEach(
+      (k, v) => counters['$k'] = max(counters['$k'] ?? 0, (v as num).toInt()),
+    );
+    (j['decor'] as Map?)?.forEach(
+      (k, v) => decorLayout.putIfAbsent(
+        '$k',
+        () => Map<String, dynamic>.from(v as Map),
+      ),
+    );
     if (activity.isEmpty) {
-      activity.addAll(((j['act'] as List?) ?? const [])
-          .map((e) => ActivityEntry.fromJson(Map<String, dynamic>.from(e as Map))));
+      activity.addAll(
+        ((j['act'] as List?) ?? const []).map(
+          (e) => ActivityEntry.fromJson(Map<String, dynamic>.from(e as Map)),
+        ),
+      );
     }
     _saveLocal();
     notifyListeners();
@@ -290,13 +370,21 @@ class ProfileService extends ChangeNotifier {
   }
 
   /// Online match: stats/activity locally, rewards are granted by the server (nx_finish_match).
-  void recordOnlineGame({
+  bool recordOnlineGame({
     required String gameId,
     required String gameNameFa,
     required String gameNameEn,
     required String outcome,
+    String? matchId,
     int score = 0,
   }) {
+    final String? receipt = matchId?.trim();
+    if (receipt != null && receipt.isNotEmpty) {
+      if (!_recordedOnlineMatches.add(receipt)) return false;
+      while (_recordedOnlineMatches.length > 512) {
+        _recordedOnlineMatches.remove(_recordedOnlineMatches.first);
+      }
+    }
     final s = stats.putIfAbsent(gameId, () => GameStats());
     s.played++;
     if (outcome == 'win') s.won++;
@@ -307,12 +395,25 @@ class ProfileService extends ChangeNotifier {
     bump('games.online');
     if (outcome == 'win') bump('games.won');
     bump('game.$gameId.played');
-    final res = outcome == 'win' ? 'برد آنلاین' : outcome == 'draw' ? 'مساوی آنلاین' : 'باخت آنلاین';
-    final resEn = outcome == 'win' ? 'Online win' : outcome == 'draw' ? 'Online draw' : 'Online loss';
-    _log('game.$gameId.$outcome', '$res در $gameNameFa', '$resEn at $gameNameEn');
+    final res = outcome == 'win'
+        ? 'برد آنلاین'
+        : outcome == 'draw'
+        ? 'مساوی آنلاین'
+        : 'باخت آنلاین';
+    final resEn = outcome == 'win'
+        ? 'Online win'
+        : outcome == 'draw'
+        ? 'Online draw'
+        : 'Online loss';
+    _log(
+      'game.$gameId.$outcome',
+      '$res در $gameNameFa',
+      '$resEn at $gameNameEn',
+    );
     _checkAchievements();
     _save();
     notifyListeners();
+    return true;
   }
 
   // ---------- Levels ----------
@@ -382,11 +483,18 @@ class ProfileService extends ChangeNotifier {
   }
 
   // ---------- Identity ----------
-  Future<void> createIdentity({required String name, String avatar = 'hero_front'}) async {
+  Future<void> createIdentity({
+    required String name,
+    String avatar = 'hero_front',
+  }) async {
     username = name.trim();
     avatarCore = avatar;
     onNameChanged?.call(username);
-    _log('identity', 'هویت دیجیتال ساخته شد: $username', 'Digital identity created: $username');
+    _log(
+      'identity',
+      'هویت دیجیتال ساخته شد: $username',
+      'Digital identity created: $username',
+    );
     await _save();
     notifyListeners();
   }
@@ -408,7 +516,10 @@ class ProfileService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> setAvatarPhoto({required String url, required String path}) async {
+  Future<void> setAvatarPhoto({
+    required String url,
+    required String path,
+  }) async {
     avatarUrl = url;
     avatarPath = path;
     await _save();
@@ -422,7 +533,13 @@ class ProfileService extends ChangeNotifier {
   }
 
   /// Award XP/coins for a real event. Applies daily cap (anti-farm).
-  AwardOutcome award(String event, {int xp = 0, int coins = 0, String? fa, String? en}) {
+  AwardOutcome award(
+    String event, {
+    int xp = 0,
+    int coins = 0,
+    String? fa,
+    String? en,
+  }) {
     final today = _today();
     if (_xpDay != today) {
       _xpDay = today;
@@ -434,14 +551,28 @@ class ProfileService extends ChangeNotifier {
     _xpToday += allowed;
     this.coins += coins;
     bump('event.$event');
-    if (fa != null || en != null) _log(event, fa ?? en ?? event, en ?? fa ?? event, xp: allowed);
+    if (fa != null || en != null) {
+      _log(event, fa ?? en ?? event, en ?? fa ?? event, xp: allowed);
+    }
     if (allowed > 0 || coins > 0) {
-      cloudQueue?.call(<String, dynamic>{'t': 'award', 'e': event, 'x': allowed, 'c': coins, 'k': _idemKey(event)});
+      cloudQueue?.call(<String, dynamic>{
+        't': 'award',
+        'e': event,
+        'x': allowed,
+        'c': coins,
+        'k': _idemKey(event),
+      });
     }
     final unlocked = _checkAchievements();
     _save();
     notifyListeners();
-    return AwardOutcome(xp: allowed, coins: coins, levelUp: level > before, newLevel: level, unlocked: unlocked);
+    return AwardOutcome(
+      xp: allowed,
+      coins: coins,
+      levelUp: level > before,
+      newLevel: level,
+      unlocked: unlocked,
+    );
   }
 
   void bump(String counter, [int by = 1]) {
@@ -468,13 +599,34 @@ class ProfileService extends ChangeNotifier {
     bump('games.played');
     if (outcome == 'win') bump('games.won');
     bump('game.$gameId.played');
-    final xpGain = switch (outcome) { 'win' => 60, 'draw' => 30, _ => 15 };
-    final coinGain = switch (outcome) { 'win' => 40, 'draw' => 15, _ => 5 };
+    final xpGain = switch (outcome) {
+      'win' => 60,
+      'draw' => 30,
+      _ => 15,
+    };
+    final coinGain = switch (outcome) {
+      'win' => 40,
+      'draw' => 15,
+      _ => 5,
+    };
     OracleBus.emit(outcome);
-    final res = outcome == 'win' ? 'برد' : outcome == 'draw' ? 'مساوی' : 'باخت';
-    final resEn = outcome == 'win' ? 'Won' : outcome == 'draw' ? 'Draw' : 'Lost';
-    return award('game.$gameId.$outcome',
-        xp: xpGain, coins: coinGain, fa: '$res در $gameNameFa', en: '$resEn at $gameNameEn');
+    final res = outcome == 'win'
+        ? 'برد'
+        : outcome == 'draw'
+        ? 'مساوی'
+        : 'باخت';
+    final resEn = outcome == 'win'
+        ? 'Won'
+        : outcome == 'draw'
+        ? 'Draw'
+        : 'Lost';
+    return award(
+      'game.$gameId.$outcome',
+      xp: xpGain,
+      coins: coinGain,
+      fa: '$res در $gameNameFa',
+      en: '$resEn at $gameNameEn',
+    );
   }
 
   int get totalGamesPlayed => stats.values.fold(0, (a, s) => a + s.played);
@@ -490,7 +642,13 @@ class ProfileService extends ChangeNotifier {
     streak = claimedDaily == y ? streak + 1 : 1;
     claimedDaily = _today();
     final bonus = 50 + min(streak, 7) * 10;
-    return award('daily', xp: 25, coins: bonus, fa: 'جایزه‌ی روزانه (روز $streak)', en: 'Daily reward (day $streak)');
+    return award(
+      'daily',
+      xp: 25,
+      coins: bonus,
+      fa: 'جایزه‌ی روزانه (روز $streak)',
+      en: 'Daily reward (day $streak)',
+    );
   }
 
   // ---------- Economy (P26: no gambling, no random paid rewards) ----------
@@ -554,7 +712,16 @@ class ProfileService extends ChangeNotifier {
   }
 
   void _log(String kind, String fa, String en, {int xp = 0}) {
-    activity.insert(0, ActivityEntry(at: DateTime.now(), kind: kind, textFa: fa, textEn: en, xp: xp));
+    activity.insert(
+      0,
+      ActivityEntry(
+        at: DateTime.now(),
+        kind: kind,
+        textFa: fa,
+        textEn: en,
+        xp: xp,
+      ),
+    );
     if (activity.length > 200) activity.removeRange(200, activity.length);
   }
 
@@ -566,7 +733,13 @@ class ProfileService extends ChangeNotifier {
         achievements.add(a.id);
         coins += a.coinReward;
         if (a.coinReward > 0) {
-          cloudQueue?.call(<String, dynamic>{'t': 'award', 'e': 'achievement.${a.id}', 'x': 0, 'c': a.coinReward, 'k': 'ach:${a.id}'});
+          cloudQueue?.call(<String, dynamic>{
+            't': 'award',
+            'e': 'achievement.${a.id}',
+            'x': 0,
+            'c': a.coinReward,
+            'k': 'ach:${a.id}',
+          });
         }
         out.add(a);
         _log('achievement', 'دستاورد: ${a.nameFa}', 'Achievement: ${a.nameEn}');
@@ -595,4 +768,6 @@ class ProfileService extends ChangeNotifier {
   }
 }
 
-final profileProvider = ChangeNotifierProvider<ProfileService>((ref) => ProfileService(LocalStore.instance));
+final profileProvider = ChangeNotifierProvider<ProfileService>(
+  (ref) => ProfileService(LocalStore.instance),
+);

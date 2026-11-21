@@ -1,13 +1,21 @@
 name: ANIX PRO Android Build
 
 on:
-  push:
-    branches: ['main']
+  # Direct diagnostic build; publication remains disabled without a validated release tag.
   workflow_dispatch:
     inputs:
       release_tag:
-        description: 'Publish a GitHub Release from the dispatched branch under this tag (e.g. anix-fs-v7). Empty = the main-branch rules below.'
+        description: Optional release tag; leave empty for a validation build only.
         required: false
+        type: string
+        default: ''
+  # Invoked by full_release_validation after all required quality gates pass.
+  workflow_call:
+    inputs:
+      release_tag:
+        description: Optional GitHub Release tag; publishing is allowed only on main after validation.
+        required: false
+        type: string
         default: ''
   # Weekly keep-alive: restoring the signing-key cache resets GitHub's 7-day eviction clock, so the app's
   # signing identity never rotates (a rotated key would stop new APKs installing over old ones).
@@ -22,21 +30,17 @@ permissions:
   contents: write
 
 env:
-  # Every push to main analyzes, tests and builds signed APKs (uploaded as workflow artifacts).
-  # A push whose commit message contains [release] (or a manual run) also publishes a GitHub Release
-  # tagged anix-v1.0.<run number>, marked Latest, with ANIX-universal.apk + ANIX-arm64-v8a.apk.
-  # A manual run with a release_tag input (e.g. a finger soccer work branch: anix-fs-v7) publishes from that branch
-  # under that tag, same files, same signing key, same vc= marker for the in-app updater.
-  RELEASE_TAG: ${{ (github.event_name == 'workflow_dispatch' && inputs.release_tag != '') && inputs.release_tag || format('anix-v1.0.{0}', github.run_number) }}
+  # Release creation is requested by the validated reusable caller, on main only.
+  RELEASE_TAG: ${{ inputs.release_tag != '' && inputs.release_tag || format('anix-v1.0.{0}', github.run_number) }}
   VERSION_NAME: 1.0.${{ github.run_number }}
-  PUBLISH: ${{ ((github.event_name == 'workflow_dispatch' && inputs.release_tag != '') || (github.event_name != 'schedule' && github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[release]')))) && 'true' || 'false' }}
-  # Public values only (the anon/publishable key is designed to ship inside the app; RLS protects the data).
-  SUPABASE_URL: https://eisstodgncimypdawisy.supabase.co
-  SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVpc3N0b2RnbmNpbXlwZGF3aXN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQyMjkwMTAsImV4cCI6MjEwOTgwNTAxMH0.uEPldAQjJdRyZTGXaz_OpFR7WpFXMiPXlW1S34cR3p8
-  LIVEKIT_URL: wss://nexora-space-xzjzlfyl.livekit.cloud
-  # Second Supabase project (games, rooms, matchmaking, tournaments, realtime match state).
-  GAMES_SUPABASE_URL: https://eyzafhrefnqlwcjpcdyg.supabase.co
-  GAMES_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5emFmaHJlZm5xbHdjanBjZHlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ4OTUzNjcsImV4cCI6MjExMDQ3MTM2N30.YfdEhbEbvbQ738snwc5C47LYx-NYRXywX66dgMEZh-M
+  PUBLISH: ${{ github.ref == 'refs/heads/main' && inputs.release_tag != '' && 'true' || 'false' }}
+  # Runtime connection values are supplied through repository Actions secrets.
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+  LIVEKIT_URL: ${{ secrets.LIVEKIT_URL }}
+  # Second Supabase project for game rooms, matchmaking, tournaments, and realtime state.
+  GAMES_SUPABASE_URL: ${{ secrets.GAMES_SUPABASE_URL }}
+  GAMES_SUPABASE_ANON_KEY: ${{ secrets.GAMES_SUPABASE_ANON_KEY }}
 
 jobs:
   build:
@@ -45,10 +49,31 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Validate required online configuration
+        if: github.event_name != 'schedule'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          LIVEKIT_URL: ${{ secrets.LIVEKIT_URL }}
+          GAMES_SUPABASE_URL: ${{ secrets.GAMES_SUPABASE_URL }}
+          GAMES_SUPABASE_ANON_KEY: ${{ secrets.GAMES_SUPABASE_ANON_KEY }}
+        run: |
+          set -eu
+          missing=0
+          for name in SUPABASE_URL SUPABASE_ANON_KEY LIVEKIT_URL GAMES_SUPABASE_URL GAMES_SUPABASE_ANON_KEY; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error title=Missing GitHub Actions secret::$name is required for online Android builds. See docs/ONLINE_SETUP.md."
+              missing=1
+            fi
+          done
+          test "$missing" -eq 0
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
+          cache: gradle
+          cache-dependency-path: pubspec.lock
 
       - uses: subosito/flutter-action@v2
         with:
@@ -287,6 +312,20 @@ jobs:
             --dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY \
             --dart-define=LIVEKIT_URL=$LIVEKIT_URL 2>&1 | tee -a build-apk.txt
 
+      - name: Build Android App Bundle
+        if: env.KEEPALIVE != 'true'
+        run: |
+          set -o pipefail
+          flutter build appbundle --release \
+            --build-number=$((300 + ${{ github.run_number }})) \
+            --build-name=$VERSION_NAME \
+            --dart-define=APP_VC=$((300 + ${{ github.run_number }})) \
+            --dart-define=GAMES_SUPABASE_URL=$GAMES_SUPABASE_URL \
+            --dart-define=GAMES_SUPABASE_ANON_KEY=$GAMES_SUPABASE_ANON_KEY \
+            --dart-define=SUPABASE_URL=$SUPABASE_URL \
+            --dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY \
+            --dart-define=LIVEKIT_URL=$LIVEKIT_URL 2>&1 | tee build-aab.txt
+
       - name: Package release files
         if: env.KEEPALIVE != 'true'
         run: |
@@ -296,6 +335,10 @@ jobs:
           cp $D/app-armeabi-v7a-release.apk out/ANIX-armeabi-v7a.apk
           cp $D/app-x86_64-release.apk out/ANIX-x86_64.apk
           cp $D/app-release.apk out/ANIX-universal.apk
+          SHORT_SHA="${GITHUB_SHA::7}"
+          cp build/app/outputs/bundle/release/app-release.aab "out/ANIX-PRO-$VERSION_NAME-$SHORT_SHA.aab"
+          test -s "out/ANIX-PRO-$VERSION_NAME-$SHORT_SHA.aab"
+          unzip -t "out/ANIX-PRO-$VERSION_NAME-$SHORT_SHA.aab" >/dev/null
           ls -l out
 
       - name: Verify installable release outputs
@@ -319,7 +362,7 @@ jobs:
         if: env.KEEPALIVE != 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: ANIX-apks
+          name: ANIX-android-${{ env.VERSION_NAME }}-${{ github.sha }}
           path: out/*
           retention-days: 30
 
@@ -343,6 +386,7 @@ jobs:
           make_latest: true
           files: |
             out/*.apk
+            out/*.aab
 
       - name: Upload logs
         if: always() && env.KEEPALIVE != 'true'
@@ -353,6 +397,7 @@ jobs:
             analyze.txt
             test.txt
             build-apk.txt
+            build-aab.txt
           retention-days: 14
 
       - name: Summary

@@ -1,0 +1,72 @@
+name: ANIX PRO Backend Validation
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-validation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  games-migrations:
+    name: Games migrations (isolated local Supabase)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v3.2.0
+        with:
+          version: latest
+
+      - name: Prepare isolated migration project
+        env:
+          TEST_PROJECT: ${{ runner.temp }}/anix-backend-validation
+        run: |
+          set -euo pipefail
+          mkdir -p "$TEST_PROJECT"
+          supabase init --workdir "$TEST_PROJECT" --force
+          mkdir -p "$TEST_PROJECT/supabase/migrations"
+          cp "$GITHUB_WORKSPACE"/supabase/games/migrations/*.sql \
+            "$TEST_PROJECT/supabase/migrations/"
+          printf 'Isolated project: %s\n' "$TEST_PROJECT"
+          printf 'Migrations copied: %s\n' "$(find "$TEST_PROJECT/supabase/migrations" -maxdepth 1 -name '*.sql' | wc -l)"
+
+      - name: Start isolated Supabase stack
+        working-directory: ${{ runner.temp }}/anix-backend-validation
+        run: supabase start --exclude studio,edge-runtime,logflare,vector,analytics,imgproxy,supavisor
+
+      - name: Replay migrations on local test database
+        working-directory: ${{ runner.temp }}/anix-backend-validation
+        run: |
+          set -o pipefail
+          supabase db reset --local 2>&1 | tee "$RUNNER_TEMP/anix-games-migration-reset.log"
+
+      - name: Lint migrated database schema
+        working-directory: ${{ runner.temp }}/anix-backend-validation
+        run: |
+          set -o pipefail
+          supabase db lint --local --schema public --fail-on error 2>&1 \
+            | tee "$RUNNER_TEMP/anix-games-db-lint.log"
+
+      - name: Upload backend validation logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: backend-validation-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/anix-games-migration-reset.log
+            ${{ runner.temp }}/anix-games-db-lint.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Stop isolated Supabase stack
+        if: always()
+        working-directory: ${{ runner.temp }}/anix-backend-validation
+        run: supabase stop --no-backup || true

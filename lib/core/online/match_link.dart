@@ -7,12 +7,21 @@ import '../../games/core/net_link.dart';
 
 /// Final state of a match as stored on the server.
 class MatchEnd {
-  const MatchEnd({required this.winners, required this.reason, this.scores});
+  const MatchEnd({
+    required this.winners,
+    required this.reason,
+    this.scores,
+    this.status = 'finished',
+  });
   final List<int> winners;
   final String reason;
   final List<int>? scores;
+  final String status;
   bool get isForfeit => reason.startsWith('forfeit');
-  int? get forfeitSeat => isForfeit ? int.tryParse(reason.split(':').last) : null;
+  bool get isDisputed => status == 'disputed' || reason == 'disputed';
+  bool get isConfirmed => status == 'finished' && !isDisputed;
+  int? get forfeitSeat =>
+      isForfeit ? int.tryParse(reason.split(':').last) : null;
 }
 
 /// Supabase implementation of [NetLink].
@@ -21,24 +30,43 @@ class MatchEnd {
 /// * Delivery: Realtime postgres_changes + a catch-up poll (never misses a move).
 /// * Presence + ephemeral 'live' messages: Realtime channel `nxm:<matchId>`.
 class SupabaseMatchLink extends ChangeNotifier implements NetLink {
-  SupabaseMatchLink._(this._c, this.matchId, this._uid, Map<String, dynamic> m) {
-    _players = (m['players'] as List<dynamic>).map((dynamic e) => '$e').toList();
-    names = ((m['names'] as List<dynamic>?) ?? const <dynamic>[]).map((dynamic e) => '$e').toList();
+  SupabaseMatchLink._(
+    this._c,
+    this.matchId,
+    this._uid,
+    Map<String, dynamic> m,
+  ) {
+    _players = (m['players'] as List<dynamic>)
+        .map((dynamic e) => '$e')
+        .toList();
+    names = ((m['names'] as List<dynamic>?) ?? const <dynamic>[])
+        .map((dynamic e) => '$e')
+        .toList();
     while (names.length < _players.length) {
       names.add('Pilot ${names.length + 1}');
     }
     seed = (m['seed'] as num).toInt();
     game = '${m['game']}';
     roomId = m['room_id'] as String?;
-    settings = Map<String, dynamic>.from((m['settings'] as Map?) ?? const <String, dynamic>{});
+    settings = Map<String, dynamic>.from(
+      (m['settings'] as Map?) ?? const <String, dynamic>{},
+    );
     mySeat = _players.indexOf(_uid);
     _status = '${m['status']}';
     if (_status != 'playing') _end = _endFrom(m);
   }
 
   /// [c] = games-project client; [uid] = the signed-in user (from the auth project's session).
-  static Future<SupabaseMatchLink> open(SupabaseClient c, String matchId, {required String uid}) async {
-    final Map<String, dynamic> m = await c.from('nx_matches').select().eq('id', matchId).single();
+  static Future<SupabaseMatchLink> open(
+    SupabaseClient c,
+    String matchId, {
+    required String uid,
+  }) async {
+    final Map<String, dynamic> m = await c
+        .from('nx_matches')
+        .select()
+        .eq('id', matchId)
+        .single();
     final SupabaseMatchLink link = SupabaseMatchLink._(c, matchId, uid, m);
     link._connect();
     return link;
@@ -73,7 +101,8 @@ class SupabaseMatchLink extends ChangeNotifier implements NetLink {
   final Map<int, NetMove> _rows = <int, NetMove>{};
   final Map<int, String> _rowUser = <int, String>{};
   final Set<int> _server = <int>{}; // seqs confirmed by the server log
-  int _delivered = 0; // highest seq handed to the current listener (or sent by us)
+  int _delivered =
+      0; // highest seq handed to the current listener (or sent by us)
   final Set<int> _ownSeqs = <int>{};
   void Function(NetMove)? _listener;
   bool _replaying = false;
@@ -82,7 +111,8 @@ class SupabaseMatchLink extends ChangeNotifier implements NetLink {
   final Set<int> _connected = <int>{};
   final Set<int> _forfeited = <int>{};
   final Map<int, DateTime> _absentSince = <int, DateTime>{};
-  final StreamController<NetLiveMessage> _live = StreamController<NetLiveMessage>.broadcast();
+  final StreamController<NetLiveMessage> _live =
+      StreamController<NetLiveMessage>.broadcast();
   int? _turnSeat;
   int _desyncs = 0;
 
@@ -110,33 +140,50 @@ class SupabaseMatchLink extends ChangeNotifier implements NetLink {
   bool get isAuthority {
     final List<int> alive = <int>[
       for (int s = 0; s < seatCount; s++)
-        if (!_forfeited.contains(s) && (_connected.contains(s) || s == mySeat)) s,
+        if (!_forfeited.contains(s) && (_connected.contains(s) || s == mySeat))
+          s,
     ];
     if (alive.isEmpty) return mySeat == 0;
     return alive.first == mySeat;
   }
 
   MatchEnd _endFrom(Map<String, dynamic> m) => MatchEnd(
-        winners: ((m['winner_seats'] as List<dynamic>?) ?? const <dynamic>[]).map((dynamic e) => (e as num).toInt()).toList(),
-        reason: '${m['reason'] ?? 'finished'}',
-        scores: (m['scores'] as List<dynamic>?)?.map((dynamic e) => (e as num).toInt()).toList(),
-      );
+    winners: ((m['winner_seats'] as List<dynamic>?) ?? const <dynamic>[])
+        .map((dynamic e) => (e as num).toInt())
+        .toList(),
+    reason: '${m['reason'] ?? 'finished'}',
+    scores: (m['scores'] as List<dynamic>?)
+        ?.map((dynamic e) => (e as num).toInt())
+        .toList(),
+    status: '${m['status'] ?? 'finished'}',
+  );
 
   void _connect() {
-    final RealtimeChannel ch = _c.channel('nxm:$matchId', opts: RealtimeChannelConfig(key: '$mySeat', self: false));
+    final RealtimeChannel ch = _c.channel(
+      'nxm:$matchId',
+      opts: RealtimeChannelConfig(key: '$mySeat', self: false),
+    );
     ch
         .onPostgresChanges(
           event: PostgresChangeEvent.insert,
           schema: 'public',
           table: 'nx_match_moves',
-          filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'match_id', value: matchId),
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'match_id',
+            value: matchId,
+          ),
           callback: (PostgresChangePayload p) => _onRow(p.newRecord),
         )
         .onPostgresChanges(
           event: PostgresChangeEvent.update,
           schema: 'public',
           table: 'nx_matches',
-          filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'id', value: matchId),
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'id',
+            value: matchId,
+          ),
           callback: (PostgresChangePayload p) => _onMatch(p.newRecord),
         )
         .onBroadcast(
@@ -145,8 +192,15 @@ class SupabaseMatchLink extends ChangeNotifier implements NetLink {
             final dynamic payload = p['payload'] ?? p;
             if (payload is Map) {
               final Map<String, dynamic> d = Map<String, dynamic>.from(payload);
-              _live.add(NetLiveMessage((d['s'] as num?)?.toInt() ?? -1, '${d['e']}',
-                  Map<String, dynamic>.from((d['d'] as Map?) ?? const <String, dynamic>{})));
+              _live.add(
+                NetLiveMessage(
+                  (d['s'] as num?)?.toInt() ?? -1,
+                  '${d['e']}',
+                  Map<String, dynamic>.from(
+                    (d['d'] as Map?) ?? const <String, dynamic>{},
+                  ),
+                ),
+              );
             }
           },
         )
@@ -160,7 +214,10 @@ class SupabaseMatchLink extends ChangeNotifier implements NetLink {
           }
         });
     _ch = ch;
-    _poll = Timer.periodic(const Duration(seconds: 4), (_) => unawaited(_catchUp()));
+    _poll = Timer.periodic(
+      const Duration(seconds: 4),
+      (_) => unawaited(_catchUp()),
+    );
     _watch = Timer.periodic(const Duration(seconds: 5), (_) => _watchAbsent());
   }
 
@@ -190,7 +247,9 @@ class SupabaseMatchLink extends ChangeNotifier implements NetLink {
     if (isOver || !isAuthority) return;
     final DateTime now = DateTime.now();
     for (int s = 0; s < seatCount; s++) {
-      if (s == mySeat || _forfeited.contains(s) || _connected.contains(s)) continue;
+      if (s == mySeat || _forfeited.contains(s) || _connected.contains(s)) {
+        continue;
+      }
       final DateTime since = _absentSince.putIfAbsent(s, () => now);
       // Tournament games carry settings.grace_sec (60 s reconnect grace); lobby games keep 40 s / 90 s.
       final int? grace = (settings['grace_sec'] as num?)?.toInt();
@@ -204,7 +263,10 @@ class SupabaseMatchLink extends ChangeNotifier implements NetLink {
 
   Future<void> _forfeitSeat(int seat) async {
     try {
-      await _c.rpc('nx_forfeit', params: <String, dynamic>{'p_match': matchId, 'p_seat': seat});
+      await _c.rpc(
+        'nx_forfeit',
+        params: <String, dynamic>{'p_match': matchId, 'p_seat': seat},
+      );
       await _catchUp();
     } catch (e) {
       debugPrint('forfeit seat $seat failed: $e');
@@ -227,7 +289,9 @@ class SupabaseMatchLink extends ChangeNotifier implements NetLink {
       seq: seq,
       seat: (r['seat'] as num).toInt(),
       kind: '${r['kind']}',
-      data: Map<String, dynamic>.from((r['move'] as Map?) ?? const <String, dynamic>{}),
+      data: Map<String, dynamic>.from(
+        (r['move'] as Map?) ?? const <String, dynamic>{},
+      ),
       hash: r['hash'] as String?,
     );
     if (_ownSeqs.contains(seq) && r['by_user'] != _uid) {
@@ -275,8 +339,11 @@ class SupabaseMatchLink extends ChangeNotifier implements NetLink {
         _onRow(Map<String, dynamic>.from(r as Map));
       }
       if (_status == 'playing') {
-        final Map<String, dynamic>? m =
-            await _c.from('nx_matches').select('status, winner_seats, reason, scores').eq('id', matchId).maybeSingle();
+        final Map<String, dynamic>? m = await _c
+            .from('nx_matches')
+            .select('status, winner_seats, reason, scores')
+            .eq('id', matchId)
+            .maybeSingle();
         if (m != null) _onMatch(m);
       }
     } catch (e) {
@@ -290,7 +357,10 @@ class SupabaseMatchLink extends ChangeNotifier implements NetLink {
   }
 
   @override
-  void listen(void Function(NetMove move) onMove, {VoidCallback? onReplayDone}) {
+  void listen(
+    void Function(NetMove move) onMove, {
+    VoidCallback? onReplayDone,
+  }) {
     _listener = onMove;
     _delivered = 0;
     _ownSeqs.clear();
@@ -301,7 +371,16 @@ class SupabaseMatchLink extends ChangeNotifier implements NetLink {
       while (_rows.containsKey(seq)) {
         final NetMove r = _rows[seq]!;
         if (_listener != onMove) return; // replaced by a newer game instance
-        onMove(NetMove(seq: r.seq, seat: r.seat, kind: r.kind, data: r.data, hash: r.hash, replay: true));
+        onMove(
+          NetMove(
+            seq: r.seq,
+            seat: r.seat,
+            kind: r.kind,
+            data: r.data,
+            hash: r.hash,
+            replay: true,
+          ),
+        );
         _delivered = seq;
         seq++;
       }
@@ -312,27 +391,41 @@ class SupabaseMatchLink extends ChangeNotifier implements NetLink {
   }
 
   @override
-  Future<bool> send(Map<String, dynamic> data, {String kind = 'move', String? hash, int? asSeat}) {
+  Future<bool> send(
+    Map<String, dynamic> data, {
+    String kind = 'move',
+    String? hash,
+    int? asSeat,
+  }) {
     if (isOver) return Future<bool>.value(false);
     final int seq = _delivered + 1;
     _delivered = seq;
     _ownSeqs.add(seq);
     final int seat = asSeat ?? mySeat;
-    _rows[seq] = NetMove(seq: seq, seat: seat, kind: kind, data: data, hash: hash);
+    _rows[seq] = NetMove(
+      seq: seq,
+      seat: seat,
+      kind: kind,
+      data: data,
+      hash: hash,
+    );
     _rowUser[seq] = _uid;
     final Completer<bool> done = Completer<bool>();
     _sendChain = _sendChain.then((_) async {
       bool ok = false;
       for (int attempt = 0; attempt < 3 && !ok; attempt++) {
         try {
-          final dynamic r = await _c.rpc('nx_push_move', params: <String, dynamic>{
-            'p_match': matchId,
-            'p_seq': seq,
-            'p_kind': kind,
-            'p_move': data,
-            'p_hash': hash,
-            'p_seat': seat,
-          });
+          final dynamic r = await _c.rpc(
+            'nx_push_move',
+            params: <String, dynamic>{
+              'p_match': matchId,
+              'p_seq': seq,
+              'p_kind': kind,
+              'p_move': data,
+              'p_hash': hash,
+              'p_seat': seat,
+            },
+          );
           if (r is Map && r['ok'] == true) {
             ok = true;
           } else if (r is Map && r['reason'] == 'seq') {
@@ -345,7 +438,9 @@ class SupabaseMatchLink extends ChangeNotifier implements NetLink {
           }
         } catch (e) {
           debugPrint('push move $seq failed (try $attempt): $e');
-          await Future<void>.delayed(Duration(milliseconds: 600 * (attempt + 1)));
+          await Future<void>.delayed(
+            Duration(milliseconds: 600 * (attempt + 1)),
+          );
         }
       }
       if (!ok && !isOver) {
@@ -362,18 +457,30 @@ class SupabaseMatchLink extends ChangeNotifier implements NetLink {
   void sendLive(String event, Map<String, dynamic> data) {
     final RealtimeChannel? ch = _ch;
     if (ch == null) return;
-    unawaited(ch.sendBroadcastMessage(event: 'live', payload: <String, dynamic>{'s': mySeat, 'e': event, 'd': data}));
+    unawaited(
+      ch.sendBroadcastMessage(
+        event: 'live',
+        payload: <String, dynamic>{'s': mySeat, 'e': event, 'd': data},
+      ),
+    );
   }
 
   @override
-  Future<void> putSecret(int seat, String slot, Map<String, dynamic> data) async {
+  Future<void> putSecret(
+    int seat,
+    String slot,
+    Map<String, dynamic> data,
+  ) async {
     if (seat < 0 || seat >= seatCount) return;
-    await _c.rpc('nx_put_secret', params: <String, dynamic>{
-      'p_match': matchId,
-      'p_user': _players[seat],
-      'p_slot': slot,
-      'p_data': data,
-    });
+    await _c.rpc(
+      'nx_put_secret',
+      params: <String, dynamic>{
+        'p_match': matchId,
+        'p_user': _players[seat],
+        'p_slot': slot,
+        'p_data': data,
+      },
+    );
   }
 
   @override
@@ -403,7 +510,11 @@ class SupabaseMatchLink extends ChangeNotifier implements NetLink {
   /// Report the final result. The server finalizes only when every player's report agrees (or the others are gone);
   /// until then it answers `{ok: true, pending: true}` and this waits (re-reporting now and then) for the final row.
   /// Conflicting reports end the match as 'disputed' (no rewards).
-  Future<MatchEnd?> report(List<int> winners, List<int>? scores, {String? hash}) async {
+  Future<MatchEnd?> report(
+    List<int> winners,
+    List<int>? scores, {
+    String? hash,
+  }) async {
     final Map<String, dynamic> params = <String, dynamic>{
       'p_match': matchId,
       'p_winners': winners,
@@ -413,16 +524,26 @@ class SupabaseMatchLink extends ChangeNotifier implements NetLink {
     };
     try {
       dynamic r = await _c.rpc('nx_finish_match', params: params);
-      for (int i = 0; i < 9 && !_disposed && r is Map && r['pending'] == true; i++) {
+      for (
+        int i = 0;
+        i < 9 && !_disposed && r is Map && r['pending'] == true;
+        i++
+      ) {
         await Future<void>.delayed(const Duration(seconds: 5));
         if (_disposed) break;
-        final Map<String, dynamic>? m =
-            await _c.from('nx_matches').select('status').eq('id', matchId).maybeSingle();
+        final Map<String, dynamic>? m = await _c
+            .from('nx_matches')
+            .select('status')
+            .eq('id', matchId)
+            .maybeSingle();
         if (m != null && '${m['status']}' != 'playing') break;
         if (i.isOdd) r = await _c.rpc('nx_finish_match', params: params);
       }
-      final Map<String, dynamic>? m =
-          await _c.from('nx_matches').select('status, winner_seats, reason, scores').eq('id', matchId).maybeSingle();
+      final Map<String, dynamic>? m = await _c
+          .from('nx_matches')
+          .select('status, winner_seats, reason, scores')
+          .eq('id', matchId)
+          .maybeSingle();
       if (m != null && '${m['status']}' != 'playing') {
         _status = '${m['status']}';
         _end = _endFrom(m);

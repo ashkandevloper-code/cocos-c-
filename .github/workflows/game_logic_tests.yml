@@ -1,0 +1,28 @@
+name: ANIX PRO Game Logic Tests
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  game-logic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-flutter
+      - name: Run game rules, bots, physics, and game-module widget tests
+        run: |
+          set -o pipefail
+          flutter test test/games --reporter expanded 2>&1 | tee game-logic-tests.txt
+        shell: bash
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: anix-pro-game-logic-${{ github.sha }}
+          path: game-logic-tests.txt
+          if-no-files-found: warn
+          retention-days: 14

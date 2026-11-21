@@ -88,13 +88,13 @@ The flagship game: flick discs, bend shots, score.
 | | Game | Online | Highlights |
 |---|---|---|---|
 | ⚽ | **Finger Soccer** | 2–6 | Club / National / Luxury teams, 3v3 rotation, 30 pitches |
-| 🎯 | **Carrom** | 2–6 | Queen + cover rule, fouls, deterministic replay |
+| 🎯 | **Carrom** | 2 | Queen + cover rule, fouls, deterministic replay |
 | 🎱 | **Billiards** | 2 | Groups, ball-in-hand, cue skins |
 | 🎲 | **Backgammon (تخته‌نرد)** | 2 | Bar, bearing off, gammons & backgammons |
 | 🟡 | **Ludo** | 2–4 | Safe stars, captures, extra turn on 6 |
 | 🐍 | **Snakes & Ladders** | 2–4 | Exact 100 to win |
 | 🃏 | **NX Cards** (UNO-style) | 2–4 | Skip / reverse / +2 / wild, the **NX!** call |
-| ❓ | **Quiz** | 2–21 | Timed questions, speed bonus, Persian banks |
+| ❓ | **Quiz** | 2 | Timed questions, speed bonus, Persian banks |
 | 🕵️ | **Mafia** | 6–12 | Godfather, doctor, detective, sniper; narrator mode; smart bots |
 | 🏎️ | **Kart Racing** | 2–4 | Arcade racing |
 | 🏃 | **Obstacle Race** | 2–4 | Party run |
@@ -102,7 +102,7 @@ The flagship game: flick discs, bend shots, score.
 | 🎱 | **Pool 8** | 2 | Quick 8-ball |
 | ⛳ | **Mini Golf** | 2–4 | Trick holes |
 | 🏀 | **Basketball Battle** | 2 | Shoot-out |
-| 🕶️ | **Spy Mafia** | 3–12 | Find the spy before they find the location |
+| 🕶️ | **Spy Mafia** | 4–8 | Find the spy before they find the location |
 
 ## 👤 Accounts
 

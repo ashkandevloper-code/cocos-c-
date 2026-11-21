@@ -100,6 +100,7 @@ class GameLaunch {
     if (n == null || seat < 0 || seat >= n.names.length) return null;
     return n.names[seat];
   }
+
   String tx(String fa, String en) => isFa ? fa : en;
 }
 
@@ -167,6 +168,8 @@ class GameInfo {
     this.supportsLocal = true,
     this.defaultPlayers = 2,
     this.supportsOnline = false,
+    this.onlineMinPlayers,
+    this.onlineMaxPlayers,
     this.solo = false,
     this.group = 0,
     this.isNew = false,
@@ -183,6 +186,11 @@ class GameInfo {
 
   /// Online multiplayer (lobby, rooms, matchmaking) is wired for this game.
   final bool supportsOnline;
+
+  /// Online-only active seat bounds when they differ from the local game bounds.
+  /// Spectators are room members and are not counted as active game seats.
+  final int? onlineMinPlayers;
+  final int? onlineMaxPlayers;
 
   final String id;
   final String nameFa;

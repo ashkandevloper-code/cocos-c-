@@ -1,5 +1,17 @@
 # آنلاین کردن NEXORA (Supabase + LiveKit)
 
+## تنظیمات امن CI برای ANIX PRO
+
+Workflow اندروید فقط از Repository Secrets در GitHub Actions استفاده می‌کند. پیش از اجرای build، این پنج مقدار را در **Settings → Secrets and variables → Actions** تعریف کنید:
+
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `LIVEKIT_URL`
+- `GAMES_SUPABASE_URL`
+- `GAMES_SUPABASE_ANON_KEY`
+
+برای build آنلاین همهٔ این مقادیر را وارد کنید. اگر هیچ‌کدام تنظیم نشده باشند، CI فقط یک candidate آفلاین می‌سازد و منتشرش نمی‌کند؛ اگر بخشی از آن‌ها تنظیم شده و بخشی خالی باشد، build با خطای پیکربندی متوقف می‌شود. Workflow زمان‌بندی‌شدهٔ نگه‌داری signing key به این مقادیر نیاز ندارد. انتشار Release فقط با tag صریح از مسیر `full_release_validation` و پس از موفقیت gateها روی main انجام می‌شود؛ artifactهای APK و AAB با نسخه و SHA کامیت نام‌گذاری می‌شوند.
+
 این نسخه کاملاً آفلاین کار می‌کند. همه‌ی منطق‌ها پشت «درز»های مشخص نوشته شده‌اند تا آنلاین کردن یعنی **پیاده‌سازی همان رابط‌ها**، نه بازنویسی.
 
 ## ۱. درزهای آماده

@@ -1,0 +1,55 @@
+name: ANIX PRO Full Release Validation
+on:
+  pull_request:
+  push:
+    branches: ['main', 'work/**']
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Optional release tag; the APK/AAB is published only after every validation job succeeds.
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  security-events: write
+
+concurrency:
+  group: full-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/flutter_quality_gate.yml
+  unit-widget:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/flutter_unit_widget_tests.yml
+  game-logic:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/game_logic_tests.yml
+  game-integration:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/game_integration_tests.yml
+  backend:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/backend_validation.yml
+  security:
+    permissions:
+      contents: read
+      security-events: write
+    uses: ./.github/workflows/security_audit.yml
+  android-release:
+    if: github.event_name != 'pull_request'
+    needs: [quality, unit-widget, game-logic, game-integration, backend, security]
+    permissions:
+      contents: write
+    uses: ./.github/workflows/android_release_build.yml
+    with:
+      release_tag: ${{ inputs.release_tag || (github.event_name == 'push' && contains(github.event.head_commit.message, '[release]') && format('anix-v1.0.{0}', github.run_number)) || '' }}
+    secrets: inherit

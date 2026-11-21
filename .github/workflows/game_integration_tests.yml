@@ -1,0 +1,47 @@
+name: ANIX PRO Game Integration Tests
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  game-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-flutter
+      - name: Prepare Flutter screenshot harness
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/ci-shots"
+          sudo mkdir -p /workspace/work /workspace/work/arcade_shots /tmp/fl
+          sudo ln -sfn "$GITHUB_WORKSPACE/ci-shots" /workspace/work/shots
+          sudo ln -sfn "$FLUTTER_ROOT" /workspace/work/flutter_sdk
+          sudo ln -sfn "$FLUTTER_ROOT" /tmp/fl/flutter
+          sudo ln -sfn "$GITHUB_WORKSPACE" /workspace/work/anix
+          sudo ln -sfn "$GITHUB_WORKSPACE" /workspace/work/rd2
+          sudo apt-get install -y -qq fonts-dejavu-core
+      - name: Run game, navigation, and room UI integration tests
+        run: |
+          set -o pipefail
+          flutter test test/app/screens_smoke_test.dart --reporter expanded 2>&1 | tee game-integration-tests.txt
+          flutter test test_render/menus_render_test.dart --dart-define=SHOTS=/workspace/work/shots --reporter expanded 2>&1 | tee -a game-integration-tests.txt
+          flutter test test_render/host_render_test.dart --dart-define=SHOTS=/workspace/work/shots --reporter expanded 2>&1 | tee -a game-integration-tests.txt
+          flutter test test_render/games_render_test.dart --dart-define=SHOTS=/workspace/work/shots --reporter expanded 2>&1 | tee -a game-integration-tests.txt
+          flutter test test_render/arcade_render_test.dart --reporter expanded 2>&1 | tee -a game-integration-tests.txt
+          flutter test test_render/finger_soccer_render_test.dart --dart-define=SHOTS=/workspace/work/shots --reporter expanded 2>&1 | tee -a game-integration-tests.txt
+          flutter test test_render/finger_soccer_intro_render_test.dart --dart-define=SHOTS=/workspace/work/shots --reporter expanded 2>&1 | tee -a game-integration-tests.txt
+        shell: bash
+      - name: Upload integration report and renders
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: anix-pro-game-integration-${{ github.sha }}
+          path: |
+            game-integration-tests.txt
+            ci-shots/
+            /workspace/work/arcade_shots/
+          if-no-files-found: warn
+          retention-days: 14
