@@ -92,6 +92,8 @@ class _BombGameState extends ArcadeLoopState<BombGame> {
       count: seats,
       botSkill: l.online ? const <double>[] : <double>[for (int i = 0; i < seats; i++) i == me ? 0 : sk],
     );
+    // HUD state must not depend on Flame's first (asynchronous, dt == 0) frame: seed the countdown now.
+    _updateBanner(0);
     unawaited(skin.load().then((_) => mounted ? setState(() {}) : null));
     final NetLink? n = l.net;
     if (n != null) {

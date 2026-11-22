@@ -61,6 +61,8 @@ class _ObstacleGameState extends ArcadeLoopState<ObstacleGame> {
       botSkill: l.online ? const <double>[] : <double>[for (int i = 0; i < seats; i++) i == me ? 0 : sk],
     )..focus = me;
     race.camera.snap(race.runners[me].y);
+    // HUD state must not depend on Flame's first (asynchronous, dt == 0) frame: seed the countdown now.
+    if (race.countdown > 0) _say('${race.countdown.ceil()}', 1);
     unawaited(skin.load().then((_) => mounted ? setState(() {}) : null));
     final NetLink? n = l.net;
     if (n != null) {

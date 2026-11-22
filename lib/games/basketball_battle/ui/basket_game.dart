@@ -98,6 +98,8 @@ class _BasketGameState extends ArcadeLoopState<BasketGame> {
       seed: seed + me * 101,
       botSkills: l.online ? const <double>[] : <double>[for (int i = 1; i < seats; i++) (sk + (i - 1) * 0.04).clamp(0.0, 1.0)],
     );
+    // HUD state must not depend on Flame's first (asynchronous, dt == 0) frame: seed the countdown now.
+    if (court.countdown > 0) _banner = '${court.countdown.ceil()}';
     unawaited(skin.load().then((_) => mounted ? setState(() {}) : null));
     final NetLink? n = l.net;
     if (n != null) {

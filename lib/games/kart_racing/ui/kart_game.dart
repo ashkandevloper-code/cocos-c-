@@ -83,6 +83,10 @@ class _KartGameState extends ArcadeLoopState<KartGame> {
     final Kart k0 = race.karts[me];
     _camPos = k0.pos;
     _camHeading = k0.heading;
+    // Flame mounts the board asynchronously and its first frame has dt == 0, so the first real tick arrives a
+    // frame or two after the first build. Seed the countdown banner from the race state now so the HUD is correct
+    // from the very first frame instead of depending on the loop having ticked.
+    if (race.countdown > 0) _setBanner('${race.countdown.ceil()}', 2);
     final NetLink? n = l.net;
     if (n != null) {
       rt = ArcadeRt(n, hz: 12)
